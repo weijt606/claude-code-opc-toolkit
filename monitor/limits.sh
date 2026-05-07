@@ -191,20 +191,25 @@ cost_of() {
 }
 
 # ── Aggregate one JSONL → totals JSON via jq ────────────────────────────────
+# IMPORTANT: `.messages` counts UNIQUE requestIds, not JSONL entry count.
+# Each Claude Code "API request" produces multiple .type=="assistant" entries
+# (one per tool call, thinking step, final answer) that all share one
+# .requestId. Anthropic's quota meter bills per request, not per entry —
+# counting entries would overcount 3-15× and make the budget % meaningless.
+# Verified 2026-05-07: 135 unique requestIds in a 5h window matches
+# claude.ai/settings/usage's "28%" reading on a Max 5× plan (~450 cap).
 sum_jsonl() {
-  # arg1: file
-  # arg2: optional ISO8601 lower bound (only count messages with .timestamp >= arg2)
   local f="$1" since="$2"
   jq -s --arg since "$since" '
     map(select(.type == "assistant" and .message.usage != null))
     | (if $since == "" then . else map(select((.timestamp // "") >= $since)) end)
     | {
-        messages: length,
+        messages: ([.[] | (.requestId // "") | select(. != "")] | unique | length),
         input:        (map(.message.usage.input_tokens // 0)                    | add // 0),
         output:       (map(.message.usage.output_tokens // 0)                   | add // 0),
         cache_create: (map(.message.usage.cache_creation_input_tokens // 0)     | add // 0),
         cache_read:   (map(.message.usage.cache_read_input_tokens // 0)         | add // 0),
-        models:       (map(.message.model // "?") | group_by(.) | map({(.[0]): length}) | add // {})
+        models:       ([.[] | {r: (.requestId // ""), m: (.message.model // "?")}] | unique_by(.r) | group_by(.m) | map({(.[0].m): length}) | add // {})
       }
   ' "$f" 2>/dev/null
 }
@@ -218,12 +223,12 @@ sum_all() {
         map(select(.type == "assistant" and .message.usage != null))
         | (if $since == "" then . else map(select((.timestamp // "") >= $since)) end)
         | {
-            messages: length,
+            messages: ([.[] | (.requestId // "") | select(. != "")] | unique | length),
             input:        (map(.message.usage.input_tokens // 0)                | add // 0),
             output:       (map(.message.usage.output_tokens // 0)               | add // 0),
             cache_create: (map(.message.usage.cache_creation_input_tokens // 0) | add // 0),
             cache_read:   (map(.message.usage.cache_read_input_tokens // 0)     | add // 0),
-            models:       (map(.message.model // "?") | group_by(.) | map({(.[0]): length}) | add // {})
+            models:       ([.[] | {r: (.requestId // ""), m: (.message.model // "?")}] | unique_by(.r) | group_by(.m) | map({(.[0].m): length}) | add // {})
           }
       ' 2>/dev/null
 }

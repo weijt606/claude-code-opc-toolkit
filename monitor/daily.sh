@@ -97,7 +97,9 @@ fmt_n() {
   }'
 }
 
-# Per-session aggregation for the day
+# Per-session aggregation for the day.
+# `messages` = unique requestIds (= API requests = what Anthropic bills),
+# NOT raw JSONL entry count. See limits.sh for the rationale.
 session_summary() {
   local f="$1"
   jq -s --arg s "$DAY_START" --arg e "$DAY_END" '
@@ -105,7 +107,7 @@ session_summary() {
                and (.timestamp // "") >= $s
                and (.timestamp // "") <= $e))
     | {
-        messages: length,
+        messages: ([.[] | (.requestId // "") | select(. != "")] | unique | length),
         input:        (map(.message.usage.input_tokens // 0)                | add // 0),
         output:       (map(.message.usage.output_tokens // 0)               | add // 0),
         cache_create: (map(.message.usage.cache_creation_input_tokens // 0) | add // 0),
