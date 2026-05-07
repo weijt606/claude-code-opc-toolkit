@@ -30,7 +30,8 @@ macOS / zsh 实测。**这是一个工坊，不是一个成品** —— 我会�
 | **事件记录器** | （hooks 自动写入）| ✅ | Hook 触发把 `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` 写到 JSONL，跨项目分析的数据源 |
 | **事件流 tail** | `cc-tail` | ✅ | 实时尾随事件流，jq 高亮。加新 hook 时排错用 |
 | **用量 / 限额监控** | `cc-limits` | ✅ | 聚合所有 transcript 的 token 用量：live process 上下文大小、5h / 24h / N 天窗口、top session、估算费用 |
-| `更多在路上…` | — | 🚧 | Skill 模板、statusline 套件、slash command 集、每日自动汇总到 Obsidian。欢迎 PR |
+| **Skill 脚手架** | `cc-skill-init <name>` | ✅ | 一行命令生成结构完整的 Claude Code skill 在 `.claude/skills/<name>/`（或 `~/.claude/skills/` 加 `--global`）—— 含 frontmatter、Step-0 读上下文区块、README、prompts、templates/examples 目录。`--opc` 快捷模式自动写入"先读 product-marketing-context.md"约定 |
+| `更多在路上…` | — | 🚧 | 每日 worklog 写手 (`cc-daily`)、statusline 模板库、slash-command 套件。欢迎 PR |
 
 ---
 
@@ -43,6 +44,8 @@ claude-code-opc-toolkit/
 │   ├── view.sh        # 仪表盘：active / recent session、prompt 计数、subagent 活动
 │   ├── resume.sh      # fzf 选择器 → claude --resume <id>
 │   └── limits.sh      # 跨所有 transcript 的 token 用量 + 估算费用
+├── skills/
+│   └── skill-init.sh  # 一行命令生成新的 Claude Code skill
 ├── settings.example.json   # 可直接 merge 进 ~/.claude/settings.json 的 4 个 hook
 └── install.sh         # 一键：软链脚本 + 加 alias
 ```
@@ -200,6 +203,55 @@ CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5 CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ
 - Claude Code **不暴露内部的速率限制计数器**。"Last 5 hours" 那块是 *从本地 transcript 聚合出来的代理指标*，不是 Anthropic 权威配额。
 - 如果你用的是 Claude Pro / Max 订阅制，费用行显示的是"按 API 价格折算"的金额 —— 用来衡量你从订阅里榨出多少价值，不是实际账单。
 - 合成 / 内部模型（`<synthetic>`）会被计入 message 数但不计费。如需干净的 per-model 数据，用 jq 过滤即可。
+
+### `cc-skill-init` —— 一行命令生成 Claude Code skill 脚手架
+
+手工建一个 skill 需要：`mkdir`、写 `SKILL.md`（YAML frontmatter）、决定目录结构、记得"先读 product context"、写起手 prompt …… 每个 10-15 分钟纯样板劳动，建 12 个就是 2-3 小时。
+
+`cc-skill-init` 把这个压缩到 1 行：
+
+```bash
+# 项目本地 skill（默认），自带 OPC "先读 product-marketing-context" 约定
+cc-skill-init voc-collect \
+  -d "每周从 Reddit/G2/X 挖客户原话" \
+  -t analyzer \
+  --opc
+
+# 自定义先读哪些文件
+cc-skill-init seo-write \
+  -d "从大纲 + voice 起草 SEO 长文" \
+  --reads .agents/voice-of-customer.md \
+  --reads .agents/keyword-targets.md
+
+# 全局 skill（~/.claude/skills/），所有项目可用
+cc-skill-init my-utility --global
+```
+
+生成的目录：
+
+```
+.claude/skills/voc-collect/
+├── SKILL.md           # YAML frontmatter + Step 0（读上下文）+ workflow 占位符
+├── README.md          # 给人看：什么时候用、怎么演进
+├── prompts/
+│   └── starter.md     # 可迭代的起手 prompt
+├── templates/.gitkeep
+└── examples/.gitkeep
+```
+
+`SKILL.md` 已经预置了 `Step 0 · Context check` 区块并接上你 `--reads` 的文件路径 —— Claude 每次调用此 skill 时**先读这些文件再动手**，强制执行 OPC 的"上下文先于动作"原则。
+
+**参数**：
+
+| 参数 | 含义 |
+|------|------|
+| `-d, --description` | 一句话描述，Claude 用它来判断"什么时候触发这个 skill" |
+| `-t, --type` | `analyzer` / `generator` / `interactive` / `hook`（仅信息性，帮你自己分类）|
+| `--reads <路径>` | skill 必须先读的文件，可重复 |
+| `--opc` | 快捷模式：自动加 `.agents/product-marketing-context.md` 和 `voice-of-customer.md` |
+| `--global` | 放到 `~/.claude/skills/` 而不是 `./.claude/skills/` |
+| `--force` | 覆盖已存在的 skill 目录 |
+| `-y, --yes` | 跳过覆盖确认 |
 
 ---
 

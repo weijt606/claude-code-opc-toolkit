@@ -9,6 +9,8 @@ set -e
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 MONITOR_SRC="$REPO_DIR/monitor"
 MONITOR_DST="$HOME/.claude/monitor"
+SKILLS_SRC="$REPO_DIR/skills"
+SKILLS_DST="$HOME/.claude/skills-bin"   # 'skills-bin' not 'skills' — Claude Code reads ~/.claude/skills/ for actual skills
 
 GREEN=$'\033[32m'; YELLOW=$'\033[33m'; DIM=$'\033[2m'; BOLD=$'\033[1m'; RESET=$'\033[0m'
 
@@ -33,6 +35,16 @@ for f in log.sh view.sh resume.sh limits.sh; do
   say "$GREEN" "✓ symlinked $MONITOR_DST/$f -> $MONITOR_SRC/$f"
 done
 
+if [ -d "$SKILLS_SRC" ]; then
+  mkdir -p "$SKILLS_DST"
+  for f in "$SKILLS_SRC"/*.sh; do
+    [ -f "$f" ] || continue
+    base=$(basename "$f")
+    ln -sf "$f" "$SKILLS_DST/$base"
+    say "$GREEN" "✓ symlinked $SKILLS_DST/$base -> $f"
+  done
+fi
+
 # ── 3. Append aliases (idempotent) ───────────────────────────────────────────
 RC_FILE=""
 if [ -f "$HOME/.zshrc" ]; then RC_FILE="$HOME/.zshrc"
@@ -48,6 +60,7 @@ alias cc-watch='$HOME/.claude/monitor/view.sh --watch'
 alias cc-resume='$HOME/.claude/monitor/resume.sh'
 alias cc-limits='$HOME/.claude/monitor/limits.sh'
 alias cc-tail='tail -f $HOME/.claude/monitor/events.jsonl | jq'
+alias cc-skill-init='$HOME/.claude/skills-bin/skill-init.sh'
 EOF
 )
 

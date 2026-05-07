@@ -30,7 +30,8 @@ Built and tested on macOS / zsh. **This is a workshop, not a product** — I'll 
 | **Event Logger** | (auto via hooks) | ✅ | Hook-driven JSONL stream of `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop`. Source for cross-project analytics. |
 | **Event Tail** | `cc-tail` | ✅ | Live `tail -f` the event log with `jq` pretty-print. Useful while debugging new hooks. |
 | **Limits / Usage Monitor** | `cc-limits` | ✅ | Aggregate token usage across all transcripts: live process context sizes, last 5h / 24h / N-day windows, top sessions, estimated cost. |
-| `more coming…` | — | 🚧 | Skill scaffolds, statusline templates, slash-command kits, daily-summary writer to Obsidian. PRs welcome. |
+| **Skill Scaffolder** | `cc-skill-init <name>` | ✅ | Generate a fully-structured Claude Code skill at `.claude/skills/<name>/` (or `~/.claude/skills/` with `--global`) — frontmatter, Step-0 read-context block, README, prompts, templates/examples dirs. `--opc` shortcut auto-wires reading `product-marketing-context.md` first. |
+| `more coming…` | — | 🚧 | Daily worklog writer (`cc-daily`), statusline gallery, slash-command kits. PRs welcome. |
 
 ---
 
@@ -43,6 +44,8 @@ claude-code-opc-toolkit/
 │   ├── view.sh        # Dashboard: active + recent sessions, prompt counts, subagents
 │   ├── resume.sh      # fzf picker → claude --resume <id>
 │   └── limits.sh      # Token usage + estimated cost across all transcripts
+├── skills/
+│   └── skill-init.sh  # Scaffold a new Claude Code skill in 1 command
 ├── settings.example.json   # 4 hooks ready to merge into ~/.claude/settings.json
 └── install.sh         # One-shot: symlinks scripts + adds aliases
 ```
@@ -201,6 +204,55 @@ CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5 CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ
 - Claude Code does NOT expose its internal rate-limit counter. The "last 5h" block is a *proxy* aggregated from local transcripts, not Anthropic's authoritative quota state.
 - If you're on Claude Pro / Max (subscription), the cost line shows what you'd *otherwise* pay at API rates — useful as a "value extracted" metric, not a literal bill.
 - Synthetic / internal models (`<synthetic>`) are counted but cost-zero. Filter with jq if you need clean per-model totals.
+
+### `cc-skill-init` — scaffold a new Claude Code skill in 1 command
+
+Building a Claude Code skill manually means: `mkdir`, write `SKILL.md` with the right YAML frontmatter, decide on directory layout, remember to read product context first, write a starter prompt… 10–15 minutes of boilerplate per skill, every time.
+
+`cc-skill-init` does it in 1 command:
+
+```bash
+# Project-local skill (default), with OPC's "always read product-marketing-context first" pattern
+cc-skill-init voc-collect \
+  -d "Mine customer quotes from Reddit/G2/X weekly" \
+  -t analyzer \
+  --opc
+
+# Custom files to read first
+cc-skill-init seo-write \
+  -d "Draft SEO blog from outline + voice" \
+  --reads .agents/voice-of-customer.md \
+  --reads .agents/keyword-targets.md
+
+# Global (~/.claude/skills/), available everywhere
+cc-skill-init my-utility --global
+```
+
+Generates:
+
+```
+.claude/skills/voc-collect/
+├── SKILL.md           # YAML frontmatter + Step 0 (read context) + workflow placeholders
+├── README.md          # for humans: when to use, how to evolve
+├── prompts/
+│   └── starter.md     # iterable prompt baseline
+├── templates/.gitkeep
+└── examples/.gitkeep
+```
+
+The `SKILL.md` already has the `Step 0 · Context check` block wired with your `--reads` files, so Claude reads them every invocation before doing anything else — the OPC discipline of "context first, action second".
+
+**Flags:**
+
+| Flag | Meaning |
+|------|---------|
+| `-d, --description` | One-liner Claude uses to decide *when* to invoke this skill |
+| `-t, --type` | `analyzer` / `generator` / `interactive` / `hook` (informational, helps you organize) |
+| `--reads <path>` | File the skill must read first. Repeat for multiple files. |
+| `--opc` | Shortcut: auto-add `.agents/product-marketing-context.md` and `voice-of-customer.md` |
+| `--global` | Create at `~/.claude/skills/` instead of `./.claude/skills/` |
+| `--force` | Overwrite an existing skill dir |
+| `-y, --yes` | Skip overwrite confirmation |
 
 ---
 
