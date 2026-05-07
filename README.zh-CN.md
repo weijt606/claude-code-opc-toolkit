@@ -2,21 +2,17 @@
   <img src="./banner.svg" alt="Claude-Code OPC Toolkit" width="100%" />
 </p>
 
-<h1 align="center">Claude-Code OPC Toolkit</h1>
-
 <p align="center">
   <a href="./README.md"><img src="https://img.shields.io/badge/lang-English-lightgrey?style=flat-square" alt="English"></a>
   <a href="./README.zh-CN.md"><img src="https://img.shields.io/badge/lang-%E4%B8%AD%E6%96%87-DC2626?style=flat-square" alt="中文"></a>
-  &nbsp;
-  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/built_for-Claude%20Code-D97757?style=flat-square" alt="Built for Claude Code"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License: MIT"></a>
-</p>
-
-<p align="center">
-  <a href="#工具"><img src="https://img.shields.io/badge/tools-6-blue?style=flat-square" alt="6 tools"></a>
-  <a href="./statuslines/"><img src="https://img.shields.io/badge/statuslines-7-7C3AED?style=flat-square" alt="7 statuslines"></a>
-  <a href="./settings.example.json"><img src="https://img.shields.io/badge/hooks-4-D97757?style=flat-square" alt="4 hooks"></a>
-  <a href="https://github.com/weijt606/claude-code-opc-toolkit/stargazers"><img src="https://img.shields.io/github/stars/weijt606/claude-code-opc-toolkit?style=flat-square&color=yellow" alt="GitHub stars"></a>
+  &nbsp;·&nbsp;
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/Claude%20Code-D97757?style=flat-square&logo=anthropic&logoColor=white" alt="Built for Claude Code"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/MIT-yellow?style=flat-square&label=license" alt="License: MIT"></a>
+  &nbsp;·&nbsp;
+  <a href="#工具"><img src="https://img.shields.io/badge/6-blue?style=flat-square&label=tools" alt="6 tools"></a>
+  <a href="./statuslines/"><img src="https://img.shields.io/badge/7-7C3AED?style=flat-square&label=statuslines" alt="7 statuslines"></a>
+  <a href="./settings.example.json"><img src="https://img.shields.io/badge/4-D97757?style=flat-square&label=hooks" alt="4 hooks"></a>
+  <a href="https://github.com/weijt606/claude-code-opc-toolkit/stargazers"><img src="https://img.shields.io/github/stars/weijt606/claude-code-opc-toolkit?style=flat-square&color=FFCC00&label=%E2%98%85" alt="GitHub stars"></a>
 </p>
 
 > 为独立全栈 AI 开发者打造的 Claude Code 效率工具集 —— **One-Person Company / Solo Founder / Solo Builder**。
