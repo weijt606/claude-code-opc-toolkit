@@ -95,17 +95,29 @@ render() {
     count=$((count+1))
   done <<< "$SESS"
 
-  # ── From hook event log (only meaningful after Claude Code restart) ───────
-  if [ -f "$LOG_FILE" ] && [ -s "$LOG_FILE" ]; then
-    # How many prompts you sent into each project's Claude Code session(s)
-    # over the last 7 days. A rough activity meter — "where did my Claude
-    # time actually go this week?".
-    printf '\n%s📊  Your prompt count, by project%s %s(last 7d — how active you were in each project)%s\n' "$C_YELLOW" "$C_RESET" "$C_DIM" "$C_RESET"
-    jq -r --arg since "$since_7d" '
-      select(.event == "UserPromptSubmit" and .ts >= $since) | (.cwd // "unknown")
-    ' "$LOG_FILE" 2>/dev/null | sort | uniq -c | sort -rn | head -8 | sed "s/^/    /"
+  # ── Prompt counts from TRANSCRIPTS (true 7d history, not hook log) ────────
+  # Why transcripts and not events.jsonl? Hooks only log prompts for sessions
+  # that started AFTER the hook was installed. Transcripts go back as far as
+  # ~/.claude/projects/ has files — the real history.
+  printf '\n%s📊  Your prompt count, by project%s %s(last 7d — how active you were in each project)%s\n' "$C_YELLOW" "$C_RESET" "$C_DIM" "$C_RESET"
+  if [ -d "$PROJ_DIR" ]; then
+    find "$PROJ_DIR" -maxdepth 2 -name '*.jsonl' -type f 2>/dev/null \
+      | xargs -L 50 cat 2>/dev/null \
+      | jq -rs --arg since "$since_7d" '
+          [.[] | select(.type == "user"
+                        and (.timestamp // "") >= $since
+                        and (.message.content // null | type == "string"))]
+          | group_by(.cwd // "unknown")
+          | map({cwd: (.[0].cwd // "unknown"), count: length})
+          | sort_by(-.count) | .[0:8]
+          | .[]
+          | "    \((.count | tostring | (. + "        ")[0:6])) \(.cwd)"
+      ' 2>/dev/null
+  fi
 
-    printf '\n%s🤖  Subagents finished%s %s(last 24h — time · agent type · session · project)%s\n' "$C_CYAN" "$C_RESET" "$C_DIM" "$C_RESET"
+  # ── Subagents from hook log (only data source for this) ───────────────────
+  if [ -f "$LOG_FILE" ] && [ -s "$LOG_FILE" ]; then
+    printf '\n%s🤖  Subagents finished%s %s(last 24h — time · project · agent type · session)%s\n' "$C_CYAN" "$C_RESET" "$C_DIM" "$C_RESET"
     local sub_count
     sub_count=$(jq -r --arg since "$since_24h" 'select(.event == "SubagentStop" and .ts >= $since) | .ts' "$LOG_FILE" 2>/dev/null | wc -l | tr -d ' ')
     if [ "$sub_count" = "0" ]; then
@@ -113,12 +125,12 @@ render() {
     else
       jq -r --arg since "$since_24h" '
         def nz(v;d): if (v // "") == "" then d else v end;
+        def pad(s;n): (s + "                              ")[0:n];
         select(.event == "SubagentStop" and .ts >= $since)
-        | "    \(.ts | .[11:19])  \(nz(.agent_type;"?") | tostring)  ·  sid \(nz(.session_id;"?") | .[0:8])  ·  \(nz(.cwd;"?") | tostring | split("/") | last)"
+        | "    \(.ts | .[11:19])  \(pad(nz(.cwd;"?") | tostring | split("/") | last; 26)) \(pad(nz(.agent_type;"?") | tostring; 14)) sid \(nz(.session_id;"?") | .[0:8])"
       ' "$LOG_FILE" 2>/dev/null | tail -10
+      printf '    %s(? = agent type not reported by Claude Code; only Task w/ explicit subagent_type fills this)%s\n' "$C_DIM" "$C_RESET"
     fi
-  else
-    printf '\n%s(hook log not yet populated — restart Claude Code or run /hooks to load new hooks)%s\n' "$C_DIM" "$C_RESET"
   fi
 
   printf '\n%scc-resume%s = pick a session interactively   %scc-status --watch%s = live mode (Ctrl-C to quit)\n' "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
