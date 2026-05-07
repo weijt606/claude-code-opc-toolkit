@@ -45,7 +45,7 @@ cc-limits        # 跨所有 transcript 的 token 用量与估算费用
 | 工具 | 状态 | 功能 |
 |------|:----:|------|
 | `cc-status` / `cc-watch` | ✅ | 跨项目的 session 仪表盘。`cc-watch` 自动刷新（默认 30 秒，`REFRESH_INTERVAL=5` 可调更紧）|
-| `cc-resume` | ✅ | 跨硬盘所有项目历史 session 的 fzf 选择器，按时间倒序，回车直达 `claude --resume <id>` |
+| `cc-resume` | ✅ | 模糊搜索式选择器（基于 `fzf`），跨硬盘所有项目的历史 session 按时间倒序，回车直达 `claude --resume <id>` |
 | `cc-limits` | ✅ | Token 用量与估算费用：当前活跃进程的上下文大小、5h / 24h / N 日窗口、消耗 top session |
 | `cc-daily` | ✅ | 给每个项目自动写 `daily-worklog.md`；可选 `--export obsidian` / `--export notion` 同步到外部 |
 | `cc-skill-init <name>` | ✅ | 一行命令在 `.claude/skills/<name>/` 生成完整 Skill 脚手架（含 frontmatter、Step-0 读上下文区块）|
