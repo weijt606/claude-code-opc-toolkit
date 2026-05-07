@@ -87,24 +87,35 @@ CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5  CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_REA
 **Plan-aware budget** — set `CC_PLAN` (or pass `--plan`) to see estimated 5-hour budget %, burn rate, and reset countdown:
 
 ```bash
-export CC_PLAN=max20      # or: pro | max5 | team | free | api
+export CC_PLAN=max5       # or: pro | max5 | max20 | team | free | api
 cc-limits
 
 # Output gains a sub-block under "Last 5 hours":
 #
-#     Claude Max (20×)  (CC_PLAN=max20)   ⚠ estimated, not authoritative
-#     Usage:    624 / ~900 msgs   ██████████░░░░  69%
-#     Burn:     125 msg/hr  →  exhaust in ~2h 12m
+#     Claude Max 5× ($100/mo)  (CC_PLAN=max5)   ⚠ estimated, not authoritative
+#     Usage:    282 / ~450 msgs   █████████░░░░░  63%
+#     Burn:     57 msg/hr  →  exhaust in ~2h 56m
 #     Resets:   in 1h 47m  (when oldest msg falls out of 5h window)
 ```
 
-Override the cap when Anthropic adjusts published quotas:
+Defaults (verified **2026-05-07**, reflecting Anthropic's 2026-05-06 announcement that Claude Code 5h limits **doubled** for all paid tiers):
+
+| Plan | 5h cap | Source flag |
+|------|--------|------------|
+| Free | ~10 | `--plan free` |
+| Pro | ~90 | `--plan pro` |
+| Max 5× ($100/mo) | ~450 | `--plan max5` (or `--plan max`) |
+| Max 20× ($200/mo) | ~1800 | `--plan max20` |
+| Team (per seat) | ~450 | `--plan team` |
+| API | no cap | `--plan api` |
+
+Override when Anthropic adjusts published quotas:
 
 ```bash
-export CC_PLAN_MSG_LIMIT_5H=1500   # or: cc-limits --plan max20 --quota 1500
+export CC_PLAN_MSG_LIMIT_5H=2000   # or: cc-limits --plan max20 --quota 2000
 ```
 
-> ⚠️ **Anthropic does not expose subscription quota state via any public API.** The plan budget block is a *local-data approximation*: 5h message count ÷ community-known published cap. Useful as a guardrail, **not** authoritative — server-side throttling can hit earlier or later than the bar suggests. On Claude Pro/Max the cost line shows "value at API rates", not a real bill.
+> ⚠️ **Anthropic does not expose subscription quota state via any public API**, and metering is **token-based** (a prompt with a big attachment can burn 10× a normal message). The plan budget block is a *local-data approximation*: 5h message count ÷ community-known published cap. Useful as a guardrail, **not** authoritative — server-side throttling can hit earlier or later than the bar suggests. There's also a **separate weekly cap** that this tool does not yet model. On Claude Pro/Max the cost line shows "value at API rates", not a real bill.
 
 ### Daily worklog: `cc-daily`
 

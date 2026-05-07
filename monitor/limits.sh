@@ -17,14 +17,15 @@
 #     Override with env vars (see PRICING below).
 #
 # PLAN-AWARE BUDGET (optional)
-#   Set CC_PLAN to one of: free | pro | max5 | max20 | team | api
-#     export CC_PLAN=max20            # or pass --plan max20
+#   Set CC_PLAN to one of: free | pro | max | max5 | max20 | team | api
+#     export CC_PLAN=max5             # or pass --plan max5
+#     (`max` is an alias for `max5`)
 #   This adds a "Plan budget" sub-block under the 5h section showing
 #   estimated usage %, burn rate, and reset countdown — all approximations
 #   from local data. Override the message cap with:
-#     export CC_PLAN_MSG_LIMIT_5H=900   # or pass --quota 900
-#   Defaults are best-effort community knowledge of Anthropic's published
-#   numbers and may drift; override when Anthropic changes them.
+#     export CC_PLAN_MSG_LIMIT_5H=2000   # or pass --quota 2000
+#   Defaults reflect Anthropic's 2026-05-06 announcement (Claude Code 5h
+#   limits doubled for all paid tiers). They drift; override when changed.
 
 PROJ_DIR="$HOME/.claude/projects"
 SESS_DIR="$HOME/.claude/sessions"
@@ -41,18 +42,36 @@ PRICE_CACHE_WRITE="${CC_PRICE_CACHE_WRITE:-18.75}"  # cache_creation_input_token
 PRICE_CACHE_READ="${CC_PRICE_CACHE_READ:-1.50}"     # cache_read_input_tokens
 
 # ── Plan-aware budget (optional, see PLAN-AWARE BUDGET note above) ──────────
-# Approximate published 5h message caps. These DRIFT — override per-shell or
-# per-call via CC_PLAN_MSG_LIMIT_5H / --quota when Anthropic changes them.
+# Approximate 5h message caps. These DRIFT — override per-shell or per-call
+# via CC_PLAN_MSG_LIMIT_5H / --quota when Anthropic changes them.
+#
+# Last verified: 2026-05-07
+# Source: Anthropic 2026-05-06 announcement (Claude Code 5h limits DOUBLED for
+# all paid tiers; Free unchanged), confirmed via 9to5google + makeuseof
+# coverage. Pre-doubling baseline (~45 / ~225 / ~900) was Anthropic's
+# longstanding published guidance.
+#
+# Note: Anthropic does NOT publish exact caps and meters by tokens, not just
+# messages — a prompt with a big attachment can burn 10× a normal message.
+# These numbers are useful as a guardrail, not as ground truth.
+#
+# Plan       Pre-2026-05-06   Post-2026-05-06 (current default below)
+# ─────────────────────────────────────────────────────────────────
+# Free       ~10              ~10            (not doubled)
+# Pro        ~45              ~90
+# Max 5×     ~225             ~450
+# Max 20×    ~900             ~1800
+# Team/seat  ~225             ~450
 plan_meta() {
   case "$1" in
-    free)            echo "10|Claude Free" ;;
-    pro)             echo "225|Claude Pro" ;;
-    max5)            echo "225|Claude Max (5×)" ;;
-    max|max20)       echo "900|Claude Max (20×)" ;;
-    team)            echo "225|Claude Team (per seat)" ;;
-    api)             echo "0|Claude API (cost-based, no message cap)" ;;
-    "")              echo "" ;;
-    *)               echo "0|$1" ;;
+    free)         echo "10|Claude Free" ;;
+    pro)          echo "90|Claude Pro" ;;
+    max|max5)     echo "450|Claude Max 5× (\$100/mo)" ;;
+    max20)        echo "1800|Claude Max 20× (\$200/mo)" ;;
+    team)         echo "450|Claude Team (per seat)" ;;
+    api)          echo "0|Claude API (cost-based, no message cap)" ;;
+    "")           echo "" ;;
+    *)            echo "0|$1" ;;
   esac
 }
 
