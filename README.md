@@ -1,8 +1,11 @@
 # claude-code-opc-toolkit
 
+[![English](https://img.shields.io/badge/lang-English-2962FF?style=flat-square)](./README.md)
+[![中文](https://img.shields.io/badge/lang-%E4%B8%AD%E6%96%87-lightgrey?style=flat-square)](./README.zh-CN.md)
+[![Built for Claude Code](https://img.shields.io/badge/built_for-Claude%20Code-D97757?style=flat-square)](https://claude.com/claude-code)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](./LICENSE)
+
 > Claude Code toolkit for one-person companies — see all your sessions at a glance, resume any of them with one keystroke.
->
-> [中文版 README](./README.zh-CN.md)
 
 When you run multiple Claude Code sessions across multiple projects (frontend, backend, content, ops...) and accidentally close a terminal — Claude Code's built-in `claude --resume` only knows about the current `cwd`. This toolkit gives you:
 

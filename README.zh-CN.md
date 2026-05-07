@@ -1,8 +1,11 @@
 # claude-code-opc-toolkit
 
+[![English](https://img.shields.io/badge/lang-English-lightgrey?style=flat-square)](./README.md)
+[![中文](https://img.shields.io/badge/lang-%E4%B8%AD%E6%96%87-2962FF?style=flat-square)](./README.zh-CN.md)
+[![Built for Claude Code](https://img.shields.io/badge/built_for-Claude%20Code-D97757?style=flat-square)](https://claude.com/claude-code)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](./LICENSE)
+
 > 给一人公司（OPC）用的 Claude Code 工具集 —— 一眼看到所有 session，一键回到任意一个。
->
-> [English README](./README.md)
 
 当你同时跑多个 Claude Code session（前端、后端、内容、运维……），不小心关了 terminal 就找不回之前的进度 —— Claude Code 自带的 `claude --resume` 只看当前 `cwd` 的 session。这套工具给你：
 
