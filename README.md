@@ -105,11 +105,26 @@ cc-limits
 #     Resets:   in 3h 49m  (5h after session-start)
 ```
 
-**Session anchoring**: the budget counts requests from the start of your **current session** (the first request after a quiet period), not the full rolling 5h. This matches how Anthropic's `claude.ai/settings/usage` "Current session" counter behaves — they don't count old activity from before your last idle gap. The default idle threshold is **30 minutes**; tune via:
+**Session anchoring**: the budget counts requests from the start of your **current session** (the first request after a quiet period), not the full rolling 5h. This matches how Anthropic's `claude.ai/settings/usage` "Current session" counter behaves. The default idle threshold is **30 minutes**; tune via:
 
 ```bash
 export CC_SESSION_GAP_MIN=60   # 1h+ gap = new session (more conservative)
 export CC_SESSION_GAP_MIN=15   # 15min+ gap = new session (more aggressive)
+```
+
+**Calibrating against your real dashboard reading**: the plan defaults (Pro ~90, Max 5× ~450, etc.) come from Anthropic's published guidance, but their internal `% used` is **opaque-weighted by request size/complexity**, so a static "count ÷ cap" estimate drifts. If `cc-limits --plan max5` says 45% but `claude.ai/settings/usage` says 60%, anchor the tool to your reality:
+
+```bash
+cc-limits --calibrate 60         # "I see 60% on the dashboard right now"
+# → Computes your effective cap from the current request count
+# → Saves to ~/.claude/monitor/cc-plan.conf
+# → Future runs use the calibrated cap, marked "✓ calibrated"
+```
+
+Re-calibrate periodically when the underlying weight function drifts. Revert anytime:
+
+```bash
+cc-limits --calibrate-clear      # back to plan defaults
 ```
 
 Defaults (verified **2026-05-07**, reflecting Anthropic's 2026-05-06 announcement that Claude Code 5h limits **doubled** for all paid tiers):

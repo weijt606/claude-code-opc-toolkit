@@ -128,6 +128,7 @@ parse_duration() {
   exit 1
 }
 
+CALIBRATE_PCT=""
 while [ $# -gt 0 ]; do
   # Shorthand window: -30m, -24h, -7d, -2w
   if [[ "$1" =~ ^-([0-9]+)([mhdw])$ ]]; then
@@ -136,15 +137,27 @@ while [ $# -gt 0 ]; do
     continue
   fi
   case "$1" in
-    --last)  parse_duration "$2"; shift 2 ;;
-    --days)  parse_duration "${2}d"; shift 2 ;;   # legacy; delegates to parse_duration
-    --plan)  CC_PLAN="$2"; shift 2 ;;
-    --quota) CC_PLAN_MSG_LIMIT_5H="$2"; shift 2 ;;
-    --watch|-w) WATCH=1; shift ;;
-    --help|-h) sed -n '2,40p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    --last)      parse_duration "$2"; shift 2 ;;
+    --days)      parse_duration "${2}d"; shift 2 ;;
+    --plan)      CC_PLAN="$2"; shift 2 ;;
+    --quota)     CC_PLAN_MSG_LIMIT_5H="$2"; shift 2 ;;
+    --calibrate) CALIBRATE_PCT="$2"; shift 2 ;;
+    --calibrate-clear) rm -f "$HOME/.claude/monitor/cc-plan.conf" 2>/dev/null
+                       echo "✓ calibration cleared (back to plan defaults)"; exit 0 ;;
+    --watch|-w)  WATCH=1; shift ;;
+    --help|-h)   sed -n '2,40p' "$0" | sed 's/^# \?//'; exit 0 ;;
     *) shift ;;
   esac
 done
+
+# Calibration: load saved cap from config so plan_block uses it
+CALIBRATION_FILE="$HOME/.claude/monitor/cc-plan.conf"
+CALIBRATED_CAP=""
+CALIBRATED_AT=""
+if [ -f "$CALIBRATION_FILE" ]; then
+  # shellcheck disable=SC1090
+  source "$CALIBRATION_FILE"
+fi
 
 # Default window: last 24 hours
 WINDOW_SEC="${WINDOW_SEC:-86400}"
@@ -328,14 +341,26 @@ plan_block() {
   [ -z "$plan" ] && return
 
   local meta; meta=$(plan_meta "$plan")
-  local quota label
+  local quota label cap_source
   quota=$(echo "$meta" | cut -d'|' -f1)
   label=$(echo "$meta" | cut -d'|' -f2)
-  [ -n "${CC_PLAN_MSG_LIMIT_5H:-}" ] && quota="$CC_PLAN_MSG_LIMIT_5H"
+  cap_source="default"
+  # Precedence: --quota / CC_PLAN_MSG_LIMIT_5H > calibrated config > plan default
+  if [ -n "${CC_PLAN_MSG_LIMIT_5H:-}" ]; then
+    quota="$CC_PLAN_MSG_LIMIT_5H"
+    cap_source="env override"
+  elif [ -n "${CALIBRATED_CAP:-}" ] && [ "${CALIBRATED_PLAN:-}" = "$plan" ]; then
+    quota="$CALIBRATED_CAP"
+    cap_source="calibrated $(echo "${CALIBRATED_AT:-}" | cut -c1-10)"
+  fi
 
   printf '\n    %s%s%s' "$C_BOLD" "$label" "$C_RESET"
-  printf '  %s(CC_PLAN=%s)%s' "$C_DIM" "$plan" "$C_RESET"
-  printf '   %s⚠ estimated, not authoritative%s\n' "$C_YELLOW" "$C_RESET"
+  printf '  %s(CC_PLAN=%s · cap %s)%s' "$C_DIM" "$plan" "$cap_source" "$C_RESET"
+  if [ "$cap_source" = "default" ]; then
+    printf '   %s⚠ estimated, not authoritative%s\n' "$C_YELLOW" "$C_RESET"
+  else
+    printf '   %s✓ calibrated to your dashboard%s\n' "$C_GREEN" "$C_RESET"
+  fi
 
   if [ "$quota" -le 0 ]; then
     printf '    %s(no message cap on this plan — see cost line above)%s\n' "$C_DIM" "$C_RESET"
@@ -526,6 +551,53 @@ render() {
   printf '%sWindows%s: %s-30m · -1h · -24h (default) · -7d · -30d%s   %s+ --plan max5 · --watch%s\n' \
     "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET" "$C_DIM" "$C_RESET"
 }
+
+# ── Calibration mode: anchor the cap to your actual dashboard reading ──────
+if [ -n "$CALIBRATE_PCT" ]; then
+  if ! [[ "$CALIBRATE_PCT" =~ ^[0-9]+(\.[0-9]+)?$ ]] || [ "$(awk "BEGIN{print($CALIBRATE_PCT<=0||$CALIBRATE_PCT>=100)}")" = "1" ]; then
+    echo "error: --calibrate expects a percentage between 0 and 100 (e.g. 60), got '$CALIBRATE_PCT'" >&2
+    exit 1
+  fi
+  if [ -z "${CC_PLAN:-}" ]; then
+    echo "error: set CC_PLAN first (or --plan max5) so we know what plan you're calibrating" >&2
+    exit 1
+  fi
+  # Need session count to back-compute cap
+  now_epoch=$(date -u +%s)
+  since_5h=$(date -u -v-5H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d '5 hours ago' +"%Y-%m-%dT%H:%M:%SZ")
+  ss=$(session_start_ts "$since_5h")
+  if [ -z "$ss" ]; then
+    echo "error: no recent activity in the 5h window — can't calibrate without a baseline" >&2
+    exit 1
+  fi
+  m_session=$(find "$PROJ_DIR" -maxdepth 2 -name '*.jsonl' -type f 2>/dev/null \
+    | xargs -L 50 -P 1 cat 2>/dev/null \
+    | jq -rs --arg since "$ss" '
+        [.[] | select(.type == "assistant" and .message.usage != null and (.timestamp // "") >= $since) | (.requestId // "")]
+        | unique | map(select(. != "")) | length' 2>/dev/null)
+  [ -z "$m_session" ] && m_session=0
+  # cap = count / (pct/100)
+  new_cap=$(awk -v c="$m_session" -v p="$CALIBRATE_PCT" 'BEGIN { printf "%d", (c * 100 / p) + 0.5 }')
+  mkdir -p "$(dirname "$CALIBRATION_FILE")"
+  cat > "$CALIBRATION_FILE" <<EOF
+# Calibrated by cc-limits --calibrate $CALIBRATE_PCT on $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# Plan: $CC_PLAN, observed count: $m_session, observed pct: $CALIBRATE_PCT%
+CALIBRATED_CAP=$new_cap
+CALIBRATED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+CALIBRATED_PCT=$CALIBRATE_PCT
+CALIBRATED_COUNT=$m_session
+CALIBRATED_PLAN=$CC_PLAN
+EOF
+  echo "✓ Calibrated for plan $CC_PLAN"
+  echo "  observed: $m_session unique requests since session-start = ${CALIBRATE_PCT}% per dashboard"
+  echo "  → effective cap: $new_cap requests"
+  echo "  saved to $CALIBRATION_FILE"
+  echo ""
+  echo "Future cc-limits runs will use this cap. Re-run --calibrate when Anthropic's"
+  echo "weighting drifts (the % vs cap relationship isn't constant). Clear with"
+  echo "--calibrate-clear to revert to plan defaults."
+  exit 0
+fi
 
 if [ "$WATCH" = 1 ]; then
   trap 'tput cnorm 2>/dev/null; printf "\n"; exit 0' INT TERM

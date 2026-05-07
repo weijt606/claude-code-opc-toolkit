@@ -105,11 +105,26 @@ cc-limits
 #     Resets:   in 3h 49m  (5h after session-start)
 ```
 
-**Session 锚点**：预算只统计**当前 session 起**（最近一次安静期后第一条请求开始）的请求数，**不是**整个 5h 滚动窗口。这跟 `claude.ai/settings/usage` 的 "Current session" 计数器行为一致 —— Anthropic 也不会把上次空闲期之前的活动算进当前 session。默认空闲阈值 **30 分钟**，可通过：
+**Session 锚点**：预算只统计**当前 session 起**（最近一次安静期后第一条请求开始）的请求数，**不是**整个 5h 滚动窗口。这跟 `claude.ai/settings/usage` 的 "Current session" 计数器行为一致。默认空闲阈值 **30 分钟**，可通过：
 
 ```bash
 export CC_SESSION_GAP_MIN=60   # 1h+ 空闲才算新 session（更保守）
 export CC_SESSION_GAP_MIN=15   # 15min+ 空闲就算新 session（更激进）
+```
+
+**根据真实 dashboard 校准**：plan 默认值（Pro ~90、Max 5× ~450 等）来自 Anthropic 的公开声明，但他们内部的 `% used` 是按 request 大小/复杂度**不透明加权**计算的，所以静态的 "count ÷ cap" 估算会漂移。如果 `cc-limits --plan max5` 显示 45% 但 `claude.ai/settings/usage` 显示 60%，把工具锚定到真实读数：
+
+```bash
+cc-limits --calibrate 60         # "我现在 dashboard 上看到 60%"
+# → 用当前请求数反算你的有效 cap
+# → 保存到 ~/.claude/monitor/cc-plan.conf
+# → 后续运行就用这个校准后的 cap，标记为 "✓ calibrated"
+```
+
+加权函数漂移时定期重新校准。任何时候可以撤销：
+
+```bash
+cc-limits --calibrate-clear      # 回到 plan 默认值
 ```
 
 默认配额（**2026-05-07** 校对，已反映 Anthropic 2026-05-06 公告：Claude Code 5h 上限对所有付费档**翻倍**）：
