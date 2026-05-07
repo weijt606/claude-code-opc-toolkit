@@ -187,11 +187,61 @@ Adds prompt counts, subagent tracking, and per-project activity stats. Merge the
 
 ---
 
+## How it works & safety
+
+This toolkit reads only **local files Claude Code writes for you**. It makes zero outbound network requests, calls no Anthropic API, scrapes no claude.ai pages, and never touches your OAuth tokens or API keys.
+
+| Behavior | This toolkit |
+|----------|:------------:|
+| Sends data to Anthropic | ❌ never |
+| Calls Anthropic API (incl. private endpoints) | ❌ never |
+| Reads / uploads OAuth tokens or API keys | ❌ never |
+| Scrapes claude.ai or other web UIs | ❌ never |
+| Loops Claude calls to inflate usage / bypass rate limits | ❌ never |
+| Phones home with telemetry of any kind | ❌ never |
+| Uses Claude Code's official `hooks` API | ✅ passive: read stdin → append JSONL |
+| Reads `~/.claude/projects/*/*.jsonl` (your own transcripts) | ✅ your local files |
+| Invokes `claude --resume <id>` (documented public CLI flag) | ✅ standard usage |
+
+**Risk of account ban or platform alert**: none we can identify. With zero outbound requests, there's nothing for Anthropic to detect. Hooks, `--resume`, and `statusLine` are all official, publicly-documented extension points — using them as designed isn't a violation.
+
+**The `cc-limits` "% used" estimate** is reverse-engineered from your own local data: count unique `requestId`s in your transcripts, divide by Anthropic's published per-plan caps. Verifying against your own claude.ai dashboard and updating defaults is a normal observation-and-arithmetic exercise, not exploitation.
+
+### Real risks worth knowing about
+
+- **Privacy is on you**. `~/.claude/monitor/events.jsonl` carries prompt previews + full cwd paths; `~/.claude/projects/*/*.jsonl` carries entire conversations. **Don't commit either to a public repo.** `.gitignore` covers `events.jsonl` already; if you sync `~/.claude/` anywhere, exclude `projects/` too.
+- **Estimates aren't authoritative**. `cc-limits` plan budget, burn rate, reset countdown, and per-token cost projections are all derived locally and labeled `⚠ estimated, not authoritative` for a reason. Treat them as guardrails, not gospel — Anthropic's real meter can throttle earlier or later.
+- **Hooks are powerful**. Our four hooks are passive (stdin → JSONL), but if you or a teammate later adds a hook that calls external services, that's on you. Audit yours anytime: `jq '.hooks' ~/.claude/settings.json`.
+
+### What this toolkit explicitly does NOT do
+
+- ❌ Loop-call Claude to inflate or game usage stats
+- ❌ Read, copy, or share your OAuth tokens / API keys
+- ❌ Scrape undocumented endpoints or web UIs
+- ❌ Phone home with anonymized usage data (or any data at all)
+- ❌ Modify Claude Code's binary or inject code into its runtime
+
+### Pause everything without uninstalling
+
+Add to `~/.claude/settings.json`:
+
+```json
+{ "disableAllHooks": true }
+```
+
+Aliases stay (so `cc-status` etc. still work read-only on the existing data) but no new events get appended. Remove the line to re-enable.
+
+### What I'm NOT 100% certain about
+
+I haven't read every line of Anthropic's full ToS and can't promise some clause doesn't apply in some unusual interpretation. The reasoning above is based on what the toolkit *does* (zero network, local-files-only, official APIs only) being clearly orthogonal to the kinds of behaviors platforms typically police (credential theft, API abuse, scraping, fake usage). If you want full reassurance, the safe move is to email Anthropic support and link this README — happy to amend based on any feedback.
+
+---
+
 ## Caveats
 
-- **Rate limits**: Claude Code's internal counter is not exposed; the 5h block in `cc-limits` is a proxy.
-- **Privacy**: `events.jsonl` and transcript files contain prompt previews and full cwd paths — don't push them to public repos.
 - **Tested on macOS / zsh**; should work on Linux (BSD/GNU `stat` auto-detected) but not yet verified.
+- **Plan defaults drift**. `cc-limits` ships with 5h-cap defaults verified 2026-05-07. Anthropic adjusts these — override with `CC_PLAN_MSG_LIMIT_5H` when they do.
+- **Weekly rate-limit cap is not yet modeled**. Anthropic enforces a separate 7-day rolling cap; `cc-limits` only shows the 5h window.
 
 ---
 

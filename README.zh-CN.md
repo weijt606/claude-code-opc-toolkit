@@ -187,11 +187,61 @@ cc-bip-posted   # X / LinkedIn 发完帖跑一次 —— 超 24 小时状态栏�
 
 ---
 
+## 工作机制 & 安全性
+
+本工具集**只读取 Claude Code 自己写到你机器上的本地文件**。零出站网络请求、不调用 Anthropic API、不爬 claude.ai、不碰你的 OAuth token / API key。
+
+| 行为 | 本工具集 |
+|------|:------:|
+| 向 Anthropic 发任何数据 | ❌ 从不 |
+| 调用 Anthropic API（含未公开端点）| ❌ 从不 |
+| 读取/上传 OAuth token 或 API key | ❌ 从不 |
+| 爬取 claude.ai 或其他 web UI | ❌ 从不 |
+| 循环调用 Claude 制造虚假 usage / 绕过 rate limit | ❌ 从不 |
+| 任何形式的 "phone home" 上报 | ❌ 从不 |
+| 使用 Claude Code 官方的 `hooks` API | ✅ 被动：读 stdin → 追加 JSONL |
+| 读 `~/.claude/projects/*/*.jsonl`（你**自己**的 transcript）| ✅ 你的本地文件 |
+| 调用 `claude --resume <id>`（官方公开 CLI 参数）| ✅ 标准用法 |
+
+**封号或平台警报风险**：我们没识别到任何。零出站请求 = Anthropic 那边没有任何东西可以"检测"。Hooks、`--resume`、`statusLine` 都是官方公开扩展点，按设计使用不构成违反。
+
+**`cc-limits` 的 "% used" 估算**是从你本地数据反向算出来的：数 transcript 里 unique `requestId` 的数量，除以 Anthropic 公开声明的各档位上限。对照 claude.ai dashboard 验证、调整默认值，本质是**观察 + 算术**，不是利用漏洞。
+
+### 真实存在的风险（对你而言）
+
+- **隐私在你自己手上**。`~/.claude/monitor/events.jsonl` 含 prompt 前缀 + 完整 cwd 路径；`~/.claude/projects/*/*.jsonl` 含完整对话内容。**不要 push 到公开仓库**。`.gitignore` 已经处理 `events.jsonl`，如果你把 `~/.claude/` 同步到任何地方，记得把 `projects/` 也排除。
+- **估算不是真值**。`cc-limits` 的 plan 预算、burn rate、reset 倒计时、token 费用估算全部本地推算，每处都标了 `⚠ estimated, not authoritative`。当 guardrail 用，不要当真理 —— Anthropic 的实际限流可能比预测早或晚。
+- **Hooks 是双刃剑**。我们装的 4 个 hooks 都是被动写盘的，但**未来你或队友加恶意 hook**（如自动调外部 API、外发数据）就是另一回事了。审计你当前装了什么：`jq '.hooks' ~/.claude/settings.json`。
+
+### 本工具集**明确不做**的事
+
+- ❌ 循环调 Claude 来 inflate / game 用量
+- ❌ 读取、复制、分享你的 OAuth token / API key
+- ❌ 爬取未公开的端点或 web UI
+- ❌ 任何形式的 "phone home" 上报数据（连匿名都没有）
+- ❌ 修改 Claude Code 二进制 或 注入运行时代码
+
+### 不卸载、临时全停的方法
+
+在 `~/.claude/settings.json` 加：
+
+```json
+{ "disableAllHooks": true }
+```
+
+Alias 保留（`cc-status` 等仍可只读看现有数据），只是不再追加新事件。删掉这行就恢复。
+
+### 我**没有** 100% 把握的事
+
+我没有读过 Anthropic 完整 ToS 的每一行，无法保证某条不用某种异常解读会被适用。上面的判断基于：本工具的所做（零网络、只读本地文件、只用官方 API）跟平台通常会管的行为（凭证盗用、API 滥用、爬取、虚假 usage）是**正交的**。如果你要 100% 保险，最稳的做法是给 Anthropic support 发邮件附上本 README 链接 —— 收到反馈我可以据此更新文档。
+
+---
+
 ## 注意事项
 
-- **速率限制**：Claude Code 内部计数器不公开；`cc-limits` 的 5h 块是代理指标。
-- **隐私**：`events.jsonl` 与 transcript 文件包含 prompt 前缀和完整 cwd 路径 —— **不要 push 到公开仓库**。
 - **平台**：在 macOS / zsh 实测过；BSD 与 GNU `stat` 已自动适配 Linux，但暂未实测。
+- **Plan 默认值会漂移**。`cc-limits` 的 5h-cap 默认值校对于 2026-05-07。Anthropic 调整时用 `CC_PLAN_MSG_LIMIT_5H` 覆盖。
+- **周限额尚未建模**。Anthropic 还有独立的 7 天滚动上限；`cc-limits` 目前只显示 5h 窗口。
 
 ---
 
