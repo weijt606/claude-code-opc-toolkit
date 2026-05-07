@@ -30,11 +30,11 @@ cd claude-code-opc-toolkit
 source ~/.zshrc
 
 cc-status        # see all your Claude Code sessions
-cc-resume        # fzf back to any past session, anywhere on disk
+cc-resume        # interactively pick + resume any past session, anywhere on disk
 cc-limits        # token usage + cost across all transcripts
 ```
 
-Requires `bash`, `jq`, `fzf`. On macOS: `brew install jq fzf`.
+Requires `bash`, [`jq`](https://stedolan.github.io/jq/) (a command-line JSON processor), and [`fzf`](https://github.com/junegunn/fzf) (an interactive fuzzy picker for terminal lists). On macOS: `brew install jq fzf`.
 
 For prompt-count stats and subagent tracking, also merge the `hooks` block from [`settings.example.json`](./settings.example.json) into `~/.claude/settings.json` and run `/hooks` inside Claude Code (or restart).
 
@@ -45,13 +45,13 @@ For prompt-count stats and subagent tracking, also merge the `hooks` block from 
 | Tool | Status | What it does |
 |------|:------:|--------------|
 | `cc-status` / `cc-watch` | ✅ | Cross-project session dashboard. Live mode with `cc-watch` (30s default; `REFRESH_INTERVAL=5` for tighter). |
-| `cc-resume` | ✅ | fzf picker across every past session, sorted by recency → `claude --resume <id>`. |
+| `cc-resume` | ✅ | Fuzzy-search picker across every past session (uses `fzf`), sorted by recency → `claude --resume <id>`. |
 | `cc-limits` | ✅ | Token usage + estimated cost. Live processes, 5h / 24h / N-day windows, top sessions. |
 | `cc-daily` | ✅ | Per-project `daily-worklog.md` writer. Optional `--export obsidian` / `--export notion`. |
 | `cc-skill-init <name>` | ✅ | Scaffold `.claude/skills/<name>/` with frontmatter, Step-0 read-context, README, prompts, templates. |
 | `cc-tail` | ✅ | `tail -f` the hook event log with jq pretty-print. |
 | Statusline gallery | ✅ | 7 plug-and-play `statusLine` scripts; swap with `sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session`. See [`statuslines/`](./statuslines/). |
-| Hook event log | ✅ | `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` → `~/.claude/monitor/events.jsonl`. |
+| Hook event log | ✅ | `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` → `~/.claude/monitor/events.jsonl` (a [JSONL](https://jsonlines.org/) — one JSON object per line — append-only event stream). |
 
 ---
 
@@ -151,7 +151,7 @@ export CC_PLAN_MSG_LIMIT_5H=2000   # or: cc-limits --plan max20 --quota 2000
 ```bash
 cc-daily                      # write today's section to every active project
 cc-daily 2026-05-06           # specific date (YYYY-MM-DD, UTC)
-cc-daily --here               # only the current project (cwd)
+cc-daily --here               # only the current project (cwd = current working directory)
 cc-daily --dry-run            # preview without writing
 cc-daily --export obsidian    # ALSO write to $CC_OBSIDIAN_VAULT/Daily Notes/<date>.md
 cc-daily --export notion      # ALSO push to $NOTION_DB_ID (needs $NOTION_API_KEY)

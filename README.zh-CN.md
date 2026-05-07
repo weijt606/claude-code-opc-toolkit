@@ -30,11 +30,11 @@ cd claude-code-opc-toolkit
 source ~/.zshrc
 
 cc-status        # 总览所有 Claude Code session
-cc-resume        # 用 fzf 选回任意历史 session
+cc-resume        # 交互式选择 + 回到任意历史 session
 cc-limits        # 跨所有 transcript 的 token 用量与估算费用
 ```
 
-依赖：`bash`、`jq`、`fzf`。macOS 一键装：`brew install jq fzf`。
+依赖：`bash`、[`jq`](https://stedolan.github.io/jq/)（命令行 JSON 处理工具）、[`fzf`](https://github.com/junegunn/fzf)（终端交互式模糊选择器）。macOS 一键装：`brew install jq fzf`。
 
 要开启 prompt 计数与 subagent 追踪，把 [`settings.example.json`](./settings.example.json) 中的 `hooks` 块合并进 `~/.claude/settings.json`，然后在 Claude Code 里输入 `/hooks` 重载（或重启 Claude Code）。
 
@@ -51,7 +51,7 @@ cc-limits        # 跨所有 transcript 的 token 用量与估算费用
 | `cc-skill-init <name>` | ✅ | 一行命令在 `.claude/skills/<name>/` 生成完整 Skill 脚手架（含 frontmatter、Step-0 读上下文区块）|
 | `cc-tail` | ✅ | 实时 `tail -f` Hook 事件流，jq 自动高亮 |
 | Statusline 模板库 | ✅ | 7 套即插即用的 `statusLine`，`sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session` 一键切换。详见 [`statuslines/`](./statuslines/) |
-| Hook 事件流 | ✅ | `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` 事件全部写入 `~/.claude/monitor/events.jsonl` |
+| Hook 事件流 | ✅ | `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` 事件全部写入 `~/.claude/monitor/events.jsonl`（[JSONL](https://jsonlines.org/) = JSON Lines，每行一个 JSON 对象的追加式事件流）|
 
 ---
 
@@ -151,7 +151,7 @@ export CC_PLAN_MSG_LIMIT_5H=2000   # 或：cc-limits --plan max20 --quota 2000
 ```bash
 cc-daily                      # 给每个有活动的项目写今日 section
 cc-daily 2026-05-06           # 指定日期（YYYY-MM-DD，UTC）
-cc-daily --here               # 仅处理当前目录所属的项目
+cc-daily --here               # 仅处理当前目录所属的项目（cwd = current working directory，当前工作目录）
 cc-daily --dry-run            # 仅预览，不写文件
 cc-daily --export obsidian    # 同步写到 $CC_OBSIDIAN_VAULT/Daily Notes/<date>.md
 cc-daily --export notion      # 同步推到 $NOTION_DB_ID（需要 $NOTION_API_KEY）
