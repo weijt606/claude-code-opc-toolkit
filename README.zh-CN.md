@@ -5,15 +5,18 @@
 [![Built for Claude Code](https://img.shields.io/badge/built_for-Claude%20Code-D97757?style=flat-square)](https://claude.com/claude-code)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](./LICENSE)
 
-> 给一人公司（OPC）用的 Claude Code 工具集 —— 一眼看到所有 session，一键回到任意一个。
+> 给独立全栈 AI 开发者用的 Claude Code 效率工具集 —— **One-Person Company / Solo Founder / Solo Builder**。
 
-当你同时跑多个 Claude Code session（前端、后端、内容、运维……），不小心关了 terminal 就找不回之前的进度 —— Claude Code 自带的 `claude --resume` 只看当前 `cwd` 的 session。这套工具给你：
+当你一个人把 Claude Code 当成工程团队，多数时候你**会同时跑多个 session 和 subagent** —— 前端一个、后端一个、Agent 在爬文档、background task 在跑构建。Claude Code 自带的 `claude --resume` 只看当前 `cwd`，原生没有"我现在到底有几个东西在跑"的全局视图。
 
-- **跨项目可视化** —— 一个仪表盘看完所有 session 的实时状态
-- **一键 resume** —— fzf 选择器跨所有项目的全部历史 session
-- **Hook 事件流** —— session 生命周期事件流式写入 JSONL，可做数据分析
+这个工具集就是来填这个空缺的：
 
-macOS / zsh 实测，专为 indie 开发者 / 一人公司 / OPC 用户设计。
+- **跨 session、跨项目可视化** —— 一个仪表盘看完所有 session 的实时状态
+- **多 agent 协同透明度** —— 看到哪个 subagent 在哪个 session 里跑完了、什么时候
+- **一键 resume** —— fzf 选择器跨硬盘所有项目的全部历史 session，秒回上下文
+- **Hook 事件流** —— session 生命周期事件流式写入 JSONL，可做自定义分析
+
+macOS / zsh 实测。**这是一个工坊，不是一个成品** —— 我会把自己日常 Claude Code 工作流里持续提炼出来的小工具（hooks、skills、statuslines、slash commands）逐步加进来。**欢迎 issue 和 PR** —— 详见 [贡献](#贡献)。
 
 ---
 
@@ -202,20 +205,36 @@ jq -r --arg m "$(date -u +%Y-%m)" \
 
 ---
 
-## 为什么叫 "OPC"
+## 谁适合用
 
-OPC = **One-Person Company**（一人公司）。
+**独立全栈 AI 开发者**。你叫自己什么都行，对应的是同一类人：
 
-这套工具的心智模型：一个人，把 Claude Code 当成全栈工程团队。一人作业时，可观测性更重要 —— 没人能告诉你"我们昨天到哪了？"
+- **OPC** —— One-Person Company / 一人公司：一个人当一支团队
+- **Solo Founder** —— 端到端跑独立产品
+- **Solo Builder** —— 在做副业项目 / 自己的创业
+- **Indie Hacker** / **Vibe Coder** —— 同一类人不同叫法
 
-如果你不熟"OPC"这个词，把它换成 indie hacker / solo founder / vibe coder 都成立。**同一类问题，同一类解。**
+当你只有自己 + Claude Code 作为工程杠杆时，可观测性比团队场景更重要 —— 没人能告诉你"我们昨天到哪了？"。这套工具替代那个不存在的队友，给你一份仪表盘。
+
+---
+
+## 贡献
+
+这是一个我从自己日常 Claude Code 工作流里持续提炼出来的私人工具箱。会持续加新工具 —— hooks、skills、statuslines、slash commands、dashboards 都有可能。
+
+如果你也遇到过类似的小痛点并写了修复 → **欢迎 PR**。
+有想法但还没动手 → **欢迎开 issue**。
+
+收录标准是一句话：*"明天我自己会装到 `~/.claude/` 里吗？"* —— 实用至上，观点鲜明优于面面俱到。
+
+Bug 反馈和提问同样欢迎。仓库还小，每个 issue 都会被看到。
 
 ---
 
 ## License
 
-MIT —— 见 [LICENSE](./LICENSE)。
+[MIT](./LICENSE) —— 随便用、随便 fork、随便 ship。
 
 ## 作者
 
-[@weijt606](https://github.com/weijt606) · 这套工具是 OPC 工具箱的一部分，与个人 Obsidian 知识图谱（vibe-coding-bible / GTM 知识谱系）配套。
+[@weijt606](https://github.com/weijt606) · 这套工具是 OPC 工具箱的一部分，与个人 Obsidian 知识图谱（vibe-coding-bible / GTM 知识谱系 / deployment handbook）配套。

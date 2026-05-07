@@ -5,15 +5,18 @@
 [![Built for Claude Code](https://img.shields.io/badge/built_for-Claude%20Code-D97757?style=flat-square)](https://claude.com/claude-code)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](./LICENSE)
 
-> Claude Code toolkit for one-person companies — see all your sessions at a glance, resume any of them with one keystroke.
+> A growing Claude Code productivity toolkit for solo full-stack AI developers — **One-Person Company / Solo Founder / Solo Builder**.
 
-When you run multiple Claude Code sessions across multiple projects (frontend, backend, content, ops...) and accidentally close a terminal — Claude Code's built-in `claude --resume` only knows about the current `cwd`. This toolkit gives you:
+When you're a solo developer running Claude Code as your engineering team, you usually have **multiple sessions and subagents in flight at once** — frontend in one terminal, backend in another, an Agent crawling docs, a background task building. Claude Code's built-in `claude --resume` only knows about the current `cwd`, and there's no native way to see "what is everything I have running right now?".
 
-- **Cross-project visibility** — one dashboard, all sessions, real-time status
-- **One-key resume** — fzf picker across every session you've ever opened
-- **Hook-based event log** — JSONL stream of session lifecycle events for analytics
+This toolkit fills that gap:
 
-Built and tested on macOS / zsh, designed for indie developers and one-person companies who run Claude Code as their primary engineering tool.
+- **Cross-session, cross-project visibility** — one dashboard, every session, real-time status
+- **Multi-agent transparency** — see which subagents finished, in which session, when
+- **One-keystroke resume** — fzf picker across every session you've ever opened, anywhere on disk
+- **Hook-based event log** — JSONL stream of session lifecycle events for your own analytics
+
+Built and tested on macOS / zsh. **This is a workshop, not a product** — I'll keep extracting and adding small tools (hooks, skills, statuslines, slash commands) from my own daily Claude Code workflow as they prove useful. **Issues and PRs are warmly welcome** — see [Contributing](#contributing).
 
 ---
 
@@ -203,18 +206,36 @@ PRs welcome. Issues even more welcome.
 
 ---
 
-## Why "OPC"?
+## Who is this for?
 
-OPC = **One-Person Company**. The mental model behind this toolkit: one person, leveraging Claude Code as a full engineering team. When you're solo, observability matters more — you can't ask a teammate "where were we?".
+**Solo full-stack AI developers.** Whatever you call yourself, the audience is the same:
 
-If "OPC" doesn't resonate, swap it for "indie hacker", "solo founder", or "vibe coder". Same problem, same fix.
+- **OPC** — One-Person Company; one person operating like a full team
+- **Solo Founder** — running an indie product end-to-end
+- **Solo Builder** — shipping side projects or your own startup
+- **Indie Hacker** / **Vibe Coder** — same person, different vocabulary
+
+When you're alone with Claude Code as your engineering leverage, observability matters more than in team environments — you can't ask a teammate "where were we?". This toolkit replaces that teammate with a dashboard.
+
+---
+
+## Contributing
+
+This is a personal toolbox that I keep extracting from my own daily Claude Code workflow. Expect a steady trickle of new tools — hooks, skills, statuslines, slash commands, dashboards.
+
+If you have a small friction in your own Claude Code workflow and built a fix → **PR it**.
+If you have an idea but no fix → **open an issue**.
+
+The bar for inclusion: *"would I install this in my own `~/.claude/` tomorrow?"* — pragmatic over polished, opinionated over comprehensive.
+
+Bug reports and questions are equally welcome. The project is small enough that I read every issue.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+[MIT](./LICENSE) — use it, fork it, ship it.
 
 ## Author
 
-[@weijt606](https://github.com/weijt606) · Built for the OPC toolbox alongside [vibe-coding-bible](https://github.com/coreyhaines31/marketingskills) and personal Obsidian knowledge graphs.
+[@weijt606](https://github.com/weijt606) · Part of an OPC toolbox alongside personal Obsidian knowledge graphs (vibe-coding-bible, GTM playbook, deployment handbook).
