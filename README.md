@@ -279,6 +279,13 @@ When you're alone with Claude Code as your engineering leverage, observability m
 
 PRs welcome. The bar is *"would I install this in my own `~/.claude/` tomorrow?"* — pragmatic over polished, opinionated over comprehensive. Bug reports and questions equally welcome.
 
+**Language policy** — keep things English by default:
+
+- All code, shell comments, error/help messages, and docs → English
+- `README.zh-CN.md` is the only translated document; keep its structure aligned 1:1 with `README.md` so future updates can mirror cleanly
+- `statuslines/bilingual-cn.sh` is the only script whose **rendered output** is intentionally Chinese (its source comments stay English)
+- The `alt="中文"` text inside the language-switcher badge stays as-is — it's the visible label readers click to flip languages
+
 ---
 
 ## License
