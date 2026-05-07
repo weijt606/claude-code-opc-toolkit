@@ -91,18 +91,25 @@ CC_PRICE_INPUT=3 CC_PRICE_OUTPUT=15 CC_PRICE_CACHE_WRITE=3.75 CC_PRICE_CACHE_REA
 CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5  CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ=0.10 cc-limits
 ```
 
-**Plan-aware budget** — set `CC_PLAN` (or pass `--plan`) to see estimated 5-hour budget %, burn rate, and reset countdown:
+**Plan-aware budget** — set `CC_PLAN` (or pass `--plan`) to see estimated session budget %, burn rate, and reset countdown:
 
 ```bash
 export CC_PLAN=max5       # or: pro | max5 | max20 | team | free | api
 cc-limits
 
-# Output gains a sub-block under "Last 5 hours":
+# Output gains a "🎯 Plan budget" block:
 #
 #     Claude Max 5× ($100/mo)  (CC_PLAN=max5)   ⚠ estimated, not authoritative
-#     Usage:    282 / ~450 msgs   █████████░░░░░  63%
-#     Burn:     57 msg/hr  →  exhaust in ~2h 56m
-#     Resets:   in 1h 47m  (when oldest msg falls out of 5h window)
+#     Usage:    145 / ~450 msgs   ████░░░░░░░░░░  32%
+#     Burn:     123 msg/hr  →  exhaust in ~2h 28m
+#     Resets:   in 3h 49m  (5h after session-start)
+```
+
+**Session anchoring**: the budget counts requests from the start of your **current session** (the first request after a quiet period), not the full rolling 5h. This matches how Anthropic's `claude.ai/settings/usage` "Current session" counter behaves — they don't count old activity from before your last idle gap. The default idle threshold is **30 minutes**; tune via:
+
+```bash
+export CC_SESSION_GAP_MIN=60   # 1h+ gap = new session (more conservative)
+export CC_SESSION_GAP_MIN=15   # 15min+ gap = new session (more aggressive)
 ```
 
 Defaults (verified **2026-05-07**, reflecting Anthropic's 2026-05-06 announcement that Claude Code 5h limits **doubled** for all paid tiers):

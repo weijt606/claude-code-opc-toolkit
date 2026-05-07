@@ -91,18 +91,25 @@ CC_PRICE_INPUT=3 CC_PRICE_OUTPUT=15 CC_PRICE_CACHE_WRITE=3.75 CC_PRICE_CACHE_REA
 CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5  CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ=0.10 cc-limits
 ```
 
-**Plan-aware 预算** —— 设置 `CC_PLAN`（或传 `--plan`），即可看到 5 小时滚动窗口的估算用量百分比、burn rate 与窗口重置倒计时：
+**Plan-aware 预算** —— 设置 `CC_PLAN`（或传 `--plan`），即可看到当前 session 的估算用量百分比、burn rate 与重置倒计时：
 
 ```bash
 export CC_PLAN=max5       # 可选值：pro | max5 | max20 | team | free | api
 cc-limits
 
-# "Last 5 hours" 下面会多出一段：
+# 输出多出 "🎯 Plan budget" 块：
 #
 #     Claude Max 5× ($100/mo)  (CC_PLAN=max5)   ⚠ estimated, not authoritative
-#     Usage:    282 / ~450 msgs   █████████░░░░░  63%
-#     Burn:     57 msg/hr  →  exhaust in ~2h 56m
-#     Resets:   in 1h 47m  (when oldest msg falls out of 5h window)
+#     Usage:    145 / ~450 msgs   ████░░░░░░░░░░  32%
+#     Burn:     123 msg/hr  →  exhaust in ~2h 28m
+#     Resets:   in 3h 49m  (5h after session-start)
+```
+
+**Session 锚点**：预算只统计**当前 session 起**（最近一次安静期后第一条请求开始）的请求数，**不是**整个 5h 滚动窗口。这跟 `claude.ai/settings/usage` 的 "Current session" 计数器行为一致 —— Anthropic 也不会把上次空闲期之前的活动算进当前 session。默认空闲阈值 **30 分钟**，可通过：
+
+```bash
+export CC_SESSION_GAP_MIN=60   # 1h+ 空闲才算新 session（更保守）
+export CC_SESSION_GAP_MIN=15   # 15min+ 空闲就算新 session（更激进）
 ```
 
 默认配额（**2026-05-07** 校对，已反映 Anthropic 2026-05-06 公告：Claude Code 5h 上限对所有付费档**翻倍**）：

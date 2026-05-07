@@ -36,9 +36,15 @@
 #   Set CC_PLAN to one of: free | pro | max | max5 | max20 | team | api
 #     export CC_PLAN=max5             # or pass --plan max5
 #     (`max` is an alias for `max5`)
-#   This adds a "Plan budget" sub-block under the 5h section showing
-#   estimated usage %, burn rate, and reset countdown — all approximations
-#   from local data. Override the message cap with:
+#   This adds a "Plan budget" sub-block showing estimated usage %, burn
+#   rate, and reset countdown — all approximations from local data.
+#
+#   Anchoring: the budget anchors at the start of your CURRENT SESSION,
+#   not the rolling 5h edge. A new session starts at the first request
+#   after a quiet period. Tune the idle threshold:
+#     export CC_SESSION_GAP_MIN=30    # default; bump to 60 if too aggressive
+#
+#   Cap override (when Anthropic adjusts published quotas):
 #     export CC_PLAN_MSG_LIMIT_5H=2000   # or pass --quota 2000
 #   Defaults reflect Anthropic's 2026-05-06 announcement (Claude Code 5h
 #   limits doubled for all paid tiers). They drift; override when changed.
@@ -233,15 +239,53 @@ sum_all() {
       ' 2>/dev/null
 }
 
-# Earliest assistant-message timestamp in [since, now]. Empty if none.
-oldest_ts_in_window() {
+# Session-start timestamp: find the start of the current "session" inside
+# the 5h window. Anthropic doesn't use a pure rolling 5h — they anchor at
+# the first request of an active block (after a quiet period). We
+# approximate that by walking the request timestamps forward and
+# splitting at gaps >= CC_SESSION_GAP_MIN minutes (default 30).
+#
+# Returns ISO8601 or "". Override threshold:
+#   export CC_SESSION_GAP_MIN=60   # treat 1h+ gaps as session boundaries
+session_start_ts() {
   local since="$1"
-  find "$PROJ_DIR" -maxdepth 2 -name '*.jsonl' -type f 2>/dev/null \
+  local gap_min="${CC_SESSION_GAP_MIN:-30}"
+  local gap_sec=$((gap_min * 60))
+
+  # Get unique requestId timestamps in window, sorted ascending (one per requestId).
+  local ts_list
+  ts_list=$(find "$PROJ_DIR" -maxdepth 2 -name '*.jsonl' -type f 2>/dev/null \
     | xargs -L 50 -P 1 cat 2>/dev/null \
     | jq -rs --arg since "$since" '
-        [ .[] | select(.type == "assistant" and .message.usage != null and (.timestamp // "") >= $since) | .timestamp ]
-        | min // ""
-      ' 2>/dev/null
+        [ .[]
+          | select(.type == "assistant" and .message.usage != null and (.timestamp // "") >= $since)
+          | {r: (.requestId // ""), t: .timestamp}
+          | select(.r != "")
+        ]
+        | group_by(.r) | map({r: .[0].r, t: (map(.t) | min)})
+        | map(.t) | sort | .[]
+      ' 2>/dev/null)
+
+  [ -z "$ts_list" ] && return
+
+  # Walk forward; the most recent gap >= gap_sec marks the session-start
+  # anchor. Default to earliest ts if no gap found.
+  local prev=0 ss=""
+  while IFS= read -r ts; do
+    [ -z "$ts" ] && continue
+    local clean cur
+    clean=$(echo "$ts" | sed -E 's/\.[0-9]+//; s/Z$//')
+    cur=$(date -u -j -f "%Y-%m-%dT%H:%M:%S" "$clean" +%s 2>/dev/null \
+          || date -u -d "$clean" +%s 2>/dev/null)
+    [ -z "$cur" ] && continue
+    if [ "$prev" -gt 0 ] && [ $((cur - prev)) -ge "$gap_sec" ]; then
+      ss="$ts"
+    fi
+    [ -z "$ss" ] && ss="$ts"
+    prev="$cur"
+  done <<< "$ts_list"
+
+  printf '%s' "$ss"
 }
 
 # ISO8601 (with optional fractional seconds + Z) → epoch seconds, portable
@@ -266,9 +310,15 @@ human_dur() {
 }
 
 # Render plan-budget sub-block under the 5h section.
-# Args: $1 = m5 (messages in 5h window), $2 = since_5h ISO ts, $3 = now epoch
+# Args: $1 = (ignored, kept for compat), $2 = since_5h ISO ts, $3 = now epoch
+#
+# Counts messages and computes burn/reset from the SESSION-START anchor
+# (first request after the most recent gap >= CC_SESSION_GAP_MIN minutes,
+# default 30) — NOT from the rolling 5h window edge. This matches
+# Anthropic's "Current session" accounting on claude.ai/settings/usage,
+# which doesn't count old activity from before your last quiet period.
 plan_block() {
-  local m5="$1" since_5h="$2" now_epoch="$3"
+  local _unused="$1" since_5h="$2" now_epoch="$3"
   local plan="${CC_PLAN:-}"
   [ -z "$plan" ] && return
 
@@ -287,32 +337,47 @@ plan_block() {
     return
   fi
 
-  # Usage bar
+  # Find session-start anchor (first request after >= CC_SESSION_GAP_MIN gap)
+  local ss; ss=$(session_start_ts "$since_5h")
+  if [ -z "$ss" ]; then
+    printf '    %s(no recent activity — full budget available)%s\n' "$C_DIM" "$C_RESET"
+    return
+  fi
+
+  local ss_epoch; ss_epoch=$(iso_to_epoch "$ss")
+  [ -z "$ss_epoch" ] && return
+
+  # Count unique requests since session-start (not since 5h window edge)
+  local m_session
+  m_session=$(find "$PROJ_DIR" -maxdepth 2 -name '*.jsonl' -type f 2>/dev/null \
+    | xargs -L 50 -P 1 cat 2>/dev/null \
+    | jq -rs --arg since "$ss" '
+        [.[] | select(.type == "assistant" and .message.usage != null and (.timestamp // "") >= $since) | (.requestId // "")]
+        | unique | map(select(. != "")) | length
+      ' 2>/dev/null)
+  [ -z "$m_session" ] && m_session=0
+
+  # Usage bar (based on session-anchored count, not raw 5h count)
   local pct color
-  pct=$(awk -v u="$m5" -v q="$quota" 'BEGIN { printf "%.0f", (u*100)/q }')
+  pct=$(awk -v u="$m_session" -v q="$quota" 'BEGIN { printf "%.0f", (u*100)/q }')
   if   [ "$pct" -ge 80 ]; then color="$C_RED"
   elif [ "$pct" -ge 50 ]; then color="$C_YELLOW"
   else                         color="$C_GREEN"
   fi
   printf '    Usage:    %s%s%s / ~%s msgs   %s%s%s  %s%d%%%s\n' \
-    "$C_BOLD" "$m5" "$C_RESET" "$quota" \
+    "$C_BOLD" "$m_session" "$C_RESET" "$quota" \
     "$color" "$(bar "$pct" 14)" "$C_RESET" \
     "$color" "$pct" "$C_RESET"
 
-  # Burn rate + reset countdown — need oldest message in window
-  local oldest; oldest=$(oldest_ts_in_window "$since_5h")
-  if [ -z "$oldest" ] || [ "$m5" -le 0 ]; then
-    printf '    %s(no recent activity — full budget available)%s\n' "$C_DIM" "$C_RESET"
+  if [ "$m_session" -le 0 ]; then
+    printf '    %s(no activity in current session)%s\n' "$C_DIM" "$C_RESET"
     return
   fi
 
-  local oldest_epoch; oldest_epoch=$(iso_to_epoch "$oldest")
-  if [ -z "$oldest_epoch" ]; then
-    return
-  fi
-
-  local window_age=$((now_epoch - oldest_epoch))
-  [ "$window_age" -lt 60 ] && window_age=60   # avoid div-by-zero on very fresh windows
+  local window_age=$((now_epoch - ss_epoch))
+  [ "$window_age" -lt 60 ] && window_age=60   # avoid div-by-zero on very fresh sessions
+  local m5="$m_session"
+  local oldest_epoch="$ss_epoch"   # for the rest of the function below — session start is our anchor
 
   local rate_per_hr; rate_per_hr=$(awk -v m="$m5" -v s="$window_age" 'BEGIN { printf "%.0f", (m*3600)/s }')
   local remaining=$((quota - m5))
@@ -326,11 +391,13 @@ plan_block() {
       "$C_RED" "$((m5 - quota))" "$C_RESET"
   fi
 
-  # Window resets when oldest msg falls out of the rolling 5h
+  # Reset = session_start + 5h (when this session's window expires).
+  # Note: this matches Anthropic's "Resets in N hours" countdown, which
+  # anchors at session-start, not at the rolling 5h edge.
   local reset_epoch=$((oldest_epoch + 5*3600))
   local reset_in=$((reset_epoch - now_epoch))
   if [ "$reset_in" -gt 0 ]; then
-    printf '    Resets:   %s in %s%s  %s(when oldest msg falls out of 5h window)%s\n' \
+    printf '    Resets:   %s in %s%s  %s(5h after session-start)%s\n' \
       "$C_GREEN" "$(human_dur "$reset_in")" "$C_RESET" "$C_DIM" "$C_RESET"
   fi
 }
@@ -421,7 +488,7 @@ render() {
 
   # ── Plan budget (anchored to 5h rate-limit window, independent of WINDOW_SEC) ──
   if [ -n "${CC_PLAN:-}" ]; then
-    printf '\n%s🎯  Plan budget%s %s(5h rolling rate-limit window)%s\n' "$C_MAG" "$C_RESET" "$C_DIM" "$C_RESET"
+    printf '\n%s🎯  Plan budget%s %s(current session — anchored at first request after %s+ min idle)%s\n' "$C_MAG" "$C_RESET" "$C_DIM" "${CC_SESSION_GAP_MIN:-30}" "$C_RESET"
     local agg5; agg5=$(sum_all "$since_5h")
     local m5=0
     [ -n "$agg5" ] && m5=$(echo "$agg5" | jq -r '.messages')
