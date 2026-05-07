@@ -5,463 +5,149 @@
 [![Built for Claude Code](https://img.shields.io/badge/built_for-Claude%20Code-D97757?style=flat-square)](https://claude.com/claude-code)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](./LICENSE)
 
-> A growing Claude Code productivity toolkit for solo full-stack AI developers — **One-Person Company / Solo Founder / Solo Builder**.
+[![tools](https://img.shields.io/badge/tools-6-blue?style=flat-square)](#tools)
+[![statuslines](https://img.shields.io/badge/statuslines-7-7C3AED?style=flat-square)](./statuslines/)
+[![hooks](https://img.shields.io/badge/hooks-4-D97757?style=flat-square)](./settings.example.json)
+[![GitHub stars](https://img.shields.io/github/stars/weijt606/claude-code-opc-toolkit?style=flat-square&color=yellow)](https://github.com/weijt606/claude-code-opc-toolkit/stargazers)
 
-When you're a solo developer running Claude Code as your engineering team, you usually have **multiple sessions and subagents in flight at once** — frontend in one terminal, backend in another, an Agent crawling docs, a background task building. Claude Code's built-in `claude --resume` only knows about the current `cwd`, and there's no native way to see "what is everything I have running right now?".
+> Claude Code productivity toolkit for solo full-stack AI developers — **One-Person Company / Solo Founder / Solo Builder**.
 
-This toolkit fills that gap:
-
-- **Cross-session, cross-project visibility** — one dashboard, every session, real-time status
-- **Multi-agent transparency** — see which subagents finished, in which session, when
-- **One-keystroke resume** — fzf picker across every session you've ever opened, anywhere on disk
-- **Hook-based event log** — JSONL stream of session lifecycle events for your own analytics
-
-Built and tested on macOS / zsh. **This is a workshop, not a product** — I'll keep extracting and adding small tools (hooks, skills, statuslines, slash commands) from my own daily Claude Code workflow as they prove useful. **Issues and PRs are warmly welcome** — see [Contributing](#contributing).
+A growing workshop of small tools I extract from my own daily Claude Code workflow: cross-session visibility, one-keystroke resume, token usage tracking, skill scaffolding, daily worklogs, statusline templates. Issues and PRs welcome.
 
 ---
 
-## Tool List
-
-| Tool | Command | Status | What it does |
-|------|---------|:------:|--------------|
-| **Session Monitor** | `cc-status` | ✅ | Cross-project Claude Code dashboard — active + recent sessions, prompt counts, subagent activity, real CWDs read from each transcript. |
-| **Live Watch** | `cc-watch` | ✅ | Same dashboard in auto-refresh mode (default 30s; set `REFRESH_INTERVAL=5` for tighter polling). |
-| **Resume Picker** | `cc-resume` | ✅ | `fzf` picker across every past session you've ever opened, sorted by recency. One Enter → `claude --resume <id>`. |
-| **Event Logger** | (auto via hooks) | ✅ | Hook-driven JSONL stream of `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop`. Source for cross-project analytics. |
-| **Event Tail** | `cc-tail` | ✅ | Live `tail -f` the event log with `jq` pretty-print. Useful while debugging new hooks. |
-| **Limits / Usage Monitor** | `cc-limits` | ✅ | Aggregate token usage across all transcripts: live process context sizes, last 5h / 24h / N-day windows, top sessions, estimated cost. |
-| **Skill Scaffolder** | `cc-skill-init <name>` | ✅ | Generate a fully-structured Claude Code skill at `.claude/skills/<name>/` (or `~/.claude/skills/` with `--global`) — frontmatter, Step-0 read-context block, README, prompts, templates/examples dirs. `--opc` shortcut auto-wires reading `product-marketing-context.md` first. |
-| **Daily Worklog** | `cc-daily` | ✅ | Per-project `<project_root>/daily-worklog.md` auto-written from today's transcripts: totals, prompts, subagents, est cost. Optional `--export obsidian` / `--export notion` / `--global-summary`. |
-| **Statusline Gallery** | `sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session` | ✅ | 7 plug-and-play `statusLine` templates — daily driver, cost-watch, multi-session density, Pomodoro, Build-in-Public, minimal, 中文双语版。`sl-<name>` 一键切换 |
-| `more coming…` | — | 🚧 | Slash-command kits, hook templates, voice-of-customer miner, more skills scaffolds. PRs welcome. |
-
----
-
-## What's inside
-
-```
-claude-code-opc-toolkit/
-├── monitor/
-│   ├── log.sh         # Hook stdin → events.jsonl (never blocks the harness)
-│   ├── view.sh        # Dashboard: active + recent sessions, prompt counts, subagents
-│   ├── resume.sh      # fzf picker → claude --resume <id>
-│   ├── limits.sh      # Token usage + estimated cost across all transcripts
-│   └── daily.sh       # Per-project daily-worklog.md writer (Obsidian/Notion export)
-├── skills/
-│   └── skill-init.sh  # Scaffold a new Claude Code skill in 1 command
-├── statuslines/        # 7 plug-and-play statusLine templates (sl-* aliases)
-│   ├── default-opc.sh
-│   ├── cost-watch.sh
-│   ├── session-density.sh
-│   ├── pomodoro.sh
-│   ├── minimal.sh
-│   ├── build-in-public.sh
-│   └── bilingual-cn.sh
-├── settings.example.json   # 4 hooks ready to merge into ~/.claude/settings.json
-└── install.sh         # One-shot: symlinks scripts + adds aliases
-```
-
-Scripts read from two sources of truth:
-
-1. `~/.claude/projects/*/<session_id>.jsonl` — Claude Code's own transcripts. `mtime` = last activity, `.cwd` field inside = real working directory. Available without any setup.
-2. `~/.claude/monitor/events.jsonl` — populated by the hooks. Adds prompt-by-project stats and subagent activity.
-
-You can use `view.sh` and `resume.sh` **without** the hooks. The hooks add observability for prompts and subagents.
-
----
-
-## Install
-
-### Prerequisites
-- macOS (BSD `stat`) or Linux (GNU `stat`) — both supported
-- `bash`, `jq`, `fzf` — `brew install jq fzf`
-- Claude Code CLI
-
-### Quick install
+## Quickstart
 
 ```bash
 git clone https://github.com/weijt606/claude-code-opc-toolkit.git
 cd claude-code-opc-toolkit
 ./install.sh
+source ~/.zshrc
+
+cc-status        # see all your Claude Code sessions
+cc-resume        # fzf back to any past session, anywhere on disk
+cc-limits        # token usage + cost across all transcripts
 ```
 
-This will:
-1. Symlink `monitor/*.sh` into `~/.claude/monitor/`
-2. Append 4 aliases (`cc-status`, `cc-watch`, `cc-resume`, `cc-tail`) to your `~/.zshrc`
-3. Print the hook config you need to merge into `~/.claude/settings.json`
+Requires `bash`, `jq`, `fzf`. On macOS: `brew install jq fzf`.
 
-### Manual install
+For prompt-count stats and subagent tracking, also merge the `hooks` block from [`settings.example.json`](./settings.example.json) into `~/.claude/settings.json` and run `/hooks` inside Claude Code (or restart).
 
-```bash
-# 1. Clone wherever you keep tools
-git clone https://github.com/weijt606/claude-code-opc-toolkit.git ~/dev/claude-code-opc-toolkit
+---
 
-# 2. Symlink scripts
-mkdir -p ~/.claude/monitor
-ln -sf ~/dev/claude-code-opc-toolkit/monitor/log.sh    ~/.claude/monitor/log.sh
-ln -sf ~/dev/claude-code-opc-toolkit/monitor/view.sh   ~/.claude/monitor/view.sh
-ln -sf ~/dev/claude-code-opc-toolkit/monitor/resume.sh ~/.claude/monitor/resume.sh
+## Tools
 
-# 3. Add aliases to your shell rc
-cat >> ~/.zshrc <<'EOF'
-alias cc-status='$HOME/.claude/monitor/view.sh'
-alias cc-watch='$HOME/.claude/monitor/view.sh --watch'
-alias cc-resume='$HOME/.claude/monitor/resume.sh'
-alias cc-tail='tail -f $HOME/.claude/monitor/events.jsonl | jq'
-EOF
-
-# 4. Merge hooks into ~/.claude/settings.json (see settings.example.json)
-#    Then run /hooks inside Claude Code to reload, or restart Claude Code.
-```
+| Tool | Status | What it does |
+|------|:------:|--------------|
+| `cc-status` / `cc-watch` | ✅ | Cross-project session dashboard. Live mode with `cc-watch` (30s default; `REFRESH_INTERVAL=5` for tighter). |
+| `cc-resume` | ✅ | fzf picker across every past session, sorted by recency → `claude --resume <id>`. |
+| `cc-limits` | ✅ | Token usage + estimated cost. Live processes, 5h / 24h / N-day windows, top sessions. |
+| `cc-daily` | ✅ | Per-project `daily-worklog.md` writer. Optional `--export obsidian` / `--export notion`. |
+| `cc-skill-init <name>` | ✅ | Scaffold `.claude/skills/<name>/` with frontmatter, Step-0 read-context, README, prompts, templates. |
+| `cc-tail` | ✅ | `tail -f` the hook event log with jq pretty-print. |
+| Statusline gallery | ✅ | 7 plug-and-play `statusLine` scripts; swap with `sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session`. See [`statuslines/`](./statuslines/). |
+| Hook event log | ✅ | `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` → `~/.claude/monitor/events.jsonl`. |
 
 ---
 
 ## Usage
 
-### `cc-status` — one-shot snapshot
-
-```
-═══════════════════════════════════════════════════════
-   Claude Code Session Monitor    2026-05-07 12:04:01
-═══════════════════════════════════════════════════════
-
-🟢  Active sessions (touched <30 min ago)
-    1m ago    28531e24    /Users/you/dev/frontend
-                resume: claude --resume 28531e24-07de-4068-a5fb-b6decd6fdee2    (8.4M)
-    1m ago    ff76b1dc    /Users/you/dev/agent-graph
-                resume: claude --resume ff76b1dc-79a7-4dec-bb82-12198ff4532a    (2.1M)
-
-🕒  Recent sessions (last 24h, top 8 by recency)
-    1m ago    28531e24  /Users/you/dev/frontend
-    11m ago   2f9090dc  /Users/you/dev/agentagora
-    ...
-
-📊  Prompts by project (last 7d, from hook log)
-       128 /Users/you/dev/agent-graph
-        82 /Users/you/dev/frontend
-
-🤖  Subagents finished (last 24h, from hook log)
-    11:54:23  Explore           ff76b1dc
-    12:01:42  claude-code-guide ff76b1dc
-```
-
-### `cc-watch` — live mode
+### Sessions
 
 ```bash
-cc-watch                       # default refresh: 30s
-REFRESH_INTERVAL=5  cc-watch   # 5s — when actively monitoring
-REFRESH_INTERVAL=120 cc-watch  # 2 min — set-and-forget on a side monitor
+cc-status                     # one-shot dashboard
+cc-watch                      # auto-refresh (30s default)
+REFRESH_INTERVAL=5 cc-watch   # tighter polling
+cc-resume                     # fzf picker — pick any past session, Enter to resume
 ```
 
-Ctrl-C to exit; cursor restores automatically.
-
-### `cc-resume` — fzf one-key restore
+### Token usage & cost: `cc-limits`
 
 ```bash
-cc-resume
+cc-limits                     # live processes + 5h / 24h / 7d aggregates
+cc-limits --days 30 --watch
 ```
 
-Pops up an fzf picker of your last 50 sessions across all projects, sorted by recency. Pick one → automatically runs `claude --resume <id>`.
-
-**Use this when** you closed a terminal, restarted your machine, or just can't remember which session you were in this morning.
-
-### `cc-tail` — live event stream (debugging hooks)
+Pricing defaults assume Opus 4 published rates. Override per-call:
 
 ```bash
-cc-tail
-```
-
-Tail the JSONL with jq pretty-printing. Useful when adding new hooks or troubleshooting.
-
-### `cc-limits` — token usage & cost monitor
-
-```bash
-cc-limits                  # snapshot — last 5h / 24h / 7d aggregates + live processes
-cc-limits --days 30        # widen the window
-cc-limits --watch          # auto-refresh (default 60s)
-```
-
-Sample output:
-
-```
-🔥  Live processes (approx context size = last assistant turn input)
-    pid 12835   ff76b1dc      ctx 295.3k   busy   /Users/you/dev/agent-graph
-    pid 73628   2f9090dc      ctx 572.2k   idle   /Users/you/dev/agentagora
-
-⚡  Last 5 hours (rolling rate-limit window proxy — not authoritative)
-    Messages: 635   Input: 1.0k  Output: 1.4M  Cache W: 3.6M  Cache R: 229.9M  ≈ $520.17
-
-📊  Last 24 hours
-    Messages: 1396  Input: 3.0k  Output: 2.6M  ...                            ≈ $1245.29
-    1395× claude-opus-4-7
-
-🏆  Top sessions by output (last 7 days)
-    3.7M     28531e24   /Users/you/dev/tapinflow
-    1.8M     2f9090dc   /Users/you/dev/agentagora
-    ...
-```
-
-**Pricing override** (defaults assume Opus 4 published rates):
-
-```bash
-# Sonnet 4 family
+# Sonnet 4
 CC_PRICE_INPUT=3 CC_PRICE_OUTPUT=15 CC_PRICE_CACHE_WRITE=3.75 CC_PRICE_CACHE_READ=0.30 cc-limits
 
-# Haiku 4 family
-CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5 CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ=0.10 cc-limits
+# Haiku 4
+CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5  CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ=0.10 cc-limits
 ```
 
-**Caveats:**
-- Claude Code does NOT expose its internal rate-limit counter. The "last 5h" block is a *proxy* aggregated from local transcripts, not Anthropic's authoritative quota state.
-- If you're on Claude Pro / Max (subscription), the cost line shows what you'd *otherwise* pay at API rates — useful as a "value extracted" metric, not a literal bill.
-- Synthetic / internal models (`<synthetic>`) are counted but cost-zero. Filter with jq if you need clean per-model totals.
+> Claude Code does not expose its internal rate-limit counter — the 5h aggregate is a proxy, not authoritative quota state. On Claude Pro/Max the cost line is "value extracted at API rates", not a real bill.
 
-### `cc-skill-init` — scaffold a new Claude Code skill in 1 command
-
-Building a Claude Code skill manually means: `mkdir`, write `SKILL.md` with the right YAML frontmatter, decide on directory layout, remember to read product context first, write a starter prompt… 10–15 minutes of boilerplate per skill, every time.
-
-`cc-skill-init` does it in 1 command:
+### Daily worklog: `cc-daily`
 
 ```bash
-# Project-local skill (default), with OPC's "always read product-marketing-context first" pattern
-cc-skill-init voc-collect \
-  -d "Mine customer quotes from Reddit/G2/X weekly" \
-  -t analyzer \
-  --opc
-
-# Custom files to read first
-cc-skill-init seo-write \
-  -d "Draft SEO blog from outline + voice" \
-  --reads .agents/voice-of-customer.md \
-  --reads .agents/keyword-targets.md
-
-# Global (~/.claude/skills/), available everywhere
-cc-skill-init my-utility --global
+cc-daily                      # write today's section to every active project
+cc-daily 2026-05-06           # specific date (YYYY-MM-DD, UTC)
+cc-daily --here               # only the current project (cwd)
+cc-daily --dry-run            # preview without writing
+cc-daily --export obsidian    # ALSO write to $CC_OBSIDIAN_VAULT/Daily Notes/<date>.md
+cc-daily --export notion      # ALSO push to $NOTION_DB_ID (needs $NOTION_API_KEY)
 ```
 
-Generates:
+Each project gets a single cumulative `<project_root>/daily-worklog.md` — newest day on top, prepended. Re-running for the same date replaces **only that day's section**; days you already annotated stay untouched.
 
-```
-.claude/skills/voc-collect/
-├── SKILL.md           # YAML frontmatter + Step 0 (read context) + workflow placeholders
-├── README.md          # for humans: when to use, how to evolve
-├── prompts/
-│   └── starter.md     # iterable prompt baseline
-├── templates/.gitkeep
-└── examples/.gitkeep
-```
-
-The `SKILL.md` already has the `Step 0 · Context check` block wired with your `--reads` files, so Claude reads them every invocation before doing anything else — the OPC discipline of "context first, action second".
-
-**Flags:**
-
-| Flag | Meaning |
-|------|---------|
-| `-d, --description` | One-liner Claude uses to decide *when* to invoke this skill |
-| `-t, --type` | `analyzer` / `generator` / `interactive` / `hook` (informational, helps you organize) |
-| `--reads <path>` | File the skill must read first. Repeat for multiple files. |
-| `--opc` | Shortcut: auto-add `.agents/product-marketing-context.md` and `voice-of-customer.md` |
-| `--global` | Create at `~/.claude/skills/` instead of `./.claude/skills/` |
-| `--force` | Overwrite an existing skill dir |
-| `-y, --yes` | Skip overwrite confirmation |
-
-### `cc-daily` — auto-generate per-project daily worklog
-
-End of day, you've worked on 4 projects across 12 sessions. You want to remember:
-- What did I actually ask Claude today (per project)?
-- Where am I picking up tomorrow?
-- How much did I spend in tokens?
-
-`cc-daily` reads today's transcripts, groups them by project, and prepends a dated section to **`<project_root>/daily-worklog.md`** in each project. Single file per project, newest day on top, grows over time, **never overwrites your handwritten notes** within a section unless you re-run for that exact day.
+### New skill in 1 command: `cc-skill-init`
 
 ```bash
-# Default: write today's section to every project that had activity
-cc-daily
-
-# Specific date
-cc-daily 2026-05-06
-
-# Only the current project (cwd)
-cc-daily --here
-
-# Only one project by path
-cc-daily --project /Users/me/dev/tapinflow
-
-# Preview without writing
-cc-daily --dry-run
-
-# ALSO write a unified cross-project summary to Obsidian
-CC_OBSIDIAN_VAULT="$HOME/Library/.../obsidian" \
-CC_OBSIDIAN_DAILY_PATH="Daily Notes" \
-  cc-daily --export obsidian
-
-# ALSO push to Notion (requires integration token + DB)
-NOTION_API_KEY=secret_xxx NOTION_DB_ID=xxx cc-daily --export notion
+cc-skill-init voc-collect -d "Mine customer quotes weekly" --opc
+cc-skill-init seo-write -d "Draft SEO blog from voice + outline" --reads .agents/voice-of-customer.md
+cc-skill-init my-utility --global         # ~/.claude/skills/ instead of ./.claude/skills/
 ```
 
-Sample written section (in `<project_root>/daily-worklog.md`):
+Generates a complete skill structure (`SKILL.md` with frontmatter and `Step 0 · Context check`, `README.md`, `prompts/starter.md`, empty `templates/` and `examples/`).
 
-```markdown
-## 2026-05-07
-
-**Sessions**: 2 · **Messages**: 35 · **Tokens out**: 142k · **Subagents**: 3 · **Est ≈** $42.18
-
-### What I worked on
-
-<!-- Fill in 1-2 sentences while it's still fresh in your head. -->
-
-### Session ff76b1dc
- **22 msgs** · out **89.3k** · cache R **12.4M** · est ≈ **$28.10**
-
-**Top prompts**
-
-- `09:42` Stripe webhook returns 502 in production but works locally...
-- `11:15` Add idempotency key to checkout flow before deploying...
-
-### Subagents fired
-
-- `11:23` Explore (sid ff76b1dc)
-- `14:35` claude-code-guide (sid ff76b1dc)
-
-### Lessons / next
-
-<!-- 1-2 things you learned. 1 thing to pick up tomorrow. -->
-```
-
-**How it composes with other tools:**
-- The `What I worked on` and `Lessons / next` blocks are intentional placeholders — fill them in by hand for context that the transcript can't capture.
-- Re-running `cc-daily` for the same date **replaces only that day's section**; everything you wrote in other days stays untouched.
-- Run it nightly via `launchd` (macOS) or `cron` for fully automatic worklog.
-
-**Automation example (launchd, macOS):**
-
-```xml
-<!-- ~/Library/LaunchAgents/com.user.ccdaily.plist -->
-<plist version="1.0"><dict>
-  <key>Label</key><string>com.user.ccdaily</string>
-  <key>ProgramArguments</key>
-  <array><string>/Users/YOU/.claude/monitor/daily.sh</string></array>
-  <key>StartCalendarInterval</key>
-  <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
-</dict></plist>
-```
+### Statusline gallery
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.user.ccdaily.plist
+sl-default       # 📁 dir  ⎇ branch  ✨ model  ctx N%
+sl-cost          # ✨ model  ctx N%  ⏰5h $X  📅24h $Y
+sl-session       # 📁 dir  sid:xxx  🟢 live 3/8  🤖 12
+sl-pomo          # 🍅 task  📁 dir  ⏱  18:42 focus
+sl-bip           # 📁 dir  🪙 142k  💬 35  🐦 6h
+sl-cn            # 📁 项目  ✨ 模型  📊 N%  🪙 142k  🕐 14:30
+sl-minimal       # model · dir
 ```
 
-### Statusline gallery — `sl-default` / `sl-cost` / `sl-pomo` / etc.
+Pomodoro: `cc-pomo-start "task name"` / `cc-pomo-stop`. BIP: `cc-bip-posted` after each X / LinkedIn post (statusline shows ⚠ if > 24h).
 
-7 templates living under [`statuslines/`](./statuslines/) — see the [gallery README](./statuslines/README.md) for full details. The `install.sh` registers `sl-*` aliases so you can swap with one keystroke:
-
-```bash
-sl-default   # 📁 dir  ⎇ branch  ✨ model  ctx N%        (daily driver)
-sl-cost      # ✨ model  ctx N%  ⏰5h $X  📅24h $Y       (high-intensity days)
-sl-session   # 📁 dir  sid:xxx  🟢 live 3/8  🤖 12       (multi-agent workflows)
-sl-pomo      # 🍅 task  📁 dir  ⏱  18:42 focus           (focus mode)
-sl-minimal   # model · dir                               (narrow terminals)
-sl-bip       # 📁 dir  🪙 142k  💬 35  🐦 6h            (Build-in-Public)
-sl-cn        # 📁 项目  ✨ 模型  📊 N%  🪙 142k  🕐 14:30 (中文 + 北京时间)
-```
-
-Pomodoro helpers:
-
-```bash
-cc-pomo-start "fix Stripe webhook 502"   # 25 min focus → 5 min break
-cc-pomo-stop                             # cancel
-```
-
-Build-in-Public last-post timestamp:
-
-```bash
-cc-bip-posted   # run after every X / LinkedIn post — statusline shows ⚠ if > 24h ago
-```
+Full gallery + customization guide: [`statuslines/README.md`](./statuslines/README.md).
 
 ---
 
-## Hook configuration
+## Hooks (optional)
 
-The hooks log session lifecycle events to `~/.claude/monitor/events.jsonl`. Without the hooks, `cc-status` and `cc-resume` still work — they just won't show prompt counts or subagent stats.
+Adds prompt counts, subagent tracking, and per-project activity stats. Merge the `hooks` block from [`settings.example.json`](./settings.example.json) into `~/.claude/settings.json`, then run `/hooks` inside Claude Code or restart.
 
-See [`settings.example.json`](./settings.example.json) for the exact JSON to merge into `~/.claude/settings.json`. Four events are wired:
-
-| Event | Purpose |
-|-------|---------|
-| `SessionStart` | Detect new sessions and log their cwd |
-| `SessionEnd` | Mark sessions as finished |
-| `UserPromptSubmit` | Count prompts per project (rough activity proxy) |
-| `SubagentStop` | Track Task-tool subagent runs |
-
-After merging, run `/hooks` inside Claude Code to reload, or restart Claude Code. **New hooks do not apply to the current session.**
+⚠️ New hooks do **not** fire in the current session — only in fresh ones.
 
 ---
 
-## Custom queries
+## Caveats
 
-Once events are flowing, you can write custom jq queries against `~/.claude/monitor/events.jsonl`:
-
-```bash
-# Hourly activity today
-jq -r 'select(.ts >= "'$(date -u +%Y-%m-%d)'") | .ts | .[11:13]' \
-  ~/.claude/monitor/events.jsonl | sort | uniq -c
-
-# Sessions ranked by prompt count
-jq -r 'select(.event == "UserPromptSubmit") | .session_id' \
-  ~/.claude/monitor/events.jsonl | sort | uniq -c | sort -rn | head
-
-# This month's session count by project
-jq -r --arg m "$(date -u +%Y-%m)" \
-  'select(.event == "SessionStart" and (.ts | startswith($m))) | .cwd' \
-  ~/.claude/monitor/events.jsonl | sort | uniq -c | sort -rn
-```
-
----
-
-## Known limitations
-
-- **New hooks don't fire in the current session** — run `/hooks` to reload, or restart Claude Code
-- **`agent_type` field may be empty** depending on Claude Code version's `SubagentStop` payload
-- **`events.jsonl` grows forever** — see Roadmap for log rotation
-- **Privacy**: events.jsonl contains the first 80 chars of each prompt and full cwds. Don't push it to public repos. Add it to your `.gitignore` if you check `~/.claude/` into version control.
-- **macOS-tested**; the BSD/GNU `stat` detection should make Linux work, but it's untested
-
----
-
-## Roadmap
-
-- [ ] `install.sh` adds the hook block automatically (with backup)
-- [ ] Log rotation built into `log.sh` (when JSONL > 10MB)
-- [ ] HTTP webhook hook variant — push to a self-hosted dashboard
-- [ ] Daily summary auto-write to Obsidian daily notes
-- [ ] More tools: skill-init, statusline templates, slash-command kits
-
-PRs welcome. Issues even more welcome.
+- **Rate limits**: Claude Code's internal counter is not exposed; the 5h block in `cc-limits` is a proxy.
+- **Privacy**: `events.jsonl` and transcript files contain prompt previews and full cwd paths — don't push them to public repos.
+- **Tested on macOS / zsh**; should work on Linux (BSD/GNU `stat` auto-detected) but not yet verified.
 
 ---
 
 ## Who is this for?
 
-**Solo full-stack AI developers.** Whatever you call yourself, the audience is the same:
+Solo full-stack AI developers running multiple Claude Code sessions in parallel. Whatever you call yourself — **OPC**, **Solo Founder**, **Solo Builder**, **Indie Hacker**, **Vibe Coder** — same toolset, same problem.
 
-- **OPC** — One-Person Company; one person operating like a full team
-- **Solo Founder** — running an indie product end-to-end
-- **Solo Builder** — shipping side projects or your own startup
-- **Indie Hacker** / **Vibe Coder** — same person, different vocabulary
-
-When you're alone with Claude Code as your engineering leverage, observability matters more than in team environments — you can't ask a teammate "where were we?". This toolkit replaces that teammate with a dashboard.
+When you're alone with Claude Code as your engineering leverage, observability matters more than in team environments. This toolkit replaces "where were we?" with a dashboard.
 
 ---
 
 ## Contributing
 
-This is a personal toolbox that I keep extracting from my own daily Claude Code workflow. Expect a steady trickle of new tools — hooks, skills, statuslines, slash commands, dashboards.
-
-If you have a small friction in your own Claude Code workflow and built a fix → **PR it**.
-If you have an idea but no fix → **open an issue**.
-
-The bar for inclusion: *"would I install this in my own `~/.claude/` tomorrow?"* — pragmatic over polished, opinionated over comprehensive.
-
-Bug reports and questions are equally welcome. The project is small enough that I read every issue.
+PRs welcome. The bar is *"would I install this in my own `~/.claude/` tomorrow?"* — pragmatic over polished, opinionated over comprehensive. Bug reports and questions equally welcome.
 
 ---
 
@@ -469,6 +155,4 @@ Bug reports and questions are equally welcome. The project is small enough that 
 
 [MIT](./LICENSE) — use it, fork it, ship it.
 
-## Author
-
-[@weijt606](https://github.com/weijt606) · Part of an OPC toolbox alongside personal Obsidian knowledge graphs (vibe-coding-bible, GTM playbook, deployment handbook).
+— [@weijt606](https://github.com/weijt606) · part of an OPC toolbox alongside personal Obsidian knowledge graphs (vibe-coding-bible, GTM playbook, deployment handbook).
