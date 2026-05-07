@@ -12,7 +12,7 @@ Plug-and-play `statusLine` scripts for Claude Code — pick the one that matches
 | [`pomodoro.sh`](./pomodoro.sh) | `🍅 task  📁 dir  ⏱  18:42 focus` | Focus mode — 25 min work / 5 min break |
 | [`minimal.sh`](./minimal.sh) | `model · dir` | Narrow terminals / minimalists |
 | [`build-in-public.sh`](./build-in-public.sh) | `📁 dir  ✨ model  ctx  🪙 142k  💬 35  🐦 6h` | OPC creators — keep BIP reminder visible |
-| [`bilingual-cn.sh`](./bilingual-cn.sh) | `📁 dir  ✨ model  📊 N%  🪙 142k  🕐 14:30` | 中文环境 + 北京时间显示 |
+| [`bilingual-cn.sh`](./bilingual-cn.sh) | `📁 项目  ✨ 模型  📊 N%  🪙 142k  🕐 14:30` | Chinese-localized labels + Beijing time |
 
 ## Install
 

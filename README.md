@@ -180,7 +180,7 @@ Generates a complete skill structure (`SKILL.md` with frontmatter and `Step 0 ·
 | `sl-session` | `📁 dir  sid:xxx  🟢 live 3/8  🤖 12` | **Multi-session work** — see live process count and today's subagent fires |
 | `sl-pomo` | `🍅 task  📁 dir  ⏱  18:42 focus` | **Focus mode** — 25min focus / 5min break Pomodoro with task label |
 | `sl-bip` | `📁 dir  🪙 142k  💬 35  🐦 6h` | **Build-in-Public** creators — nudges with ⚠ when last post > 24h |
-| `sl-cn` | `📁 项目  ✨ 模型  📊 N%  🪙 142k  🕐 14:30` | **国内 OPC** — 中文 + 北京时间 + 今日 token |
+| `sl-cn` | `📁 项目  ✨ 模型  📊 N%  🪙 142k  🕐 14:30` | **Chinese-localized** — Chinese labels, Beijing time, today's tokens |
 | `sl-minimal` | `model · dir` | Narrow terminals / minimalists |
 
 **Pomodoro** state lives at `~/.claude/monitor/pomodoro.state`:

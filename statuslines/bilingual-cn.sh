@@ -1,6 +1,11 @@
 #!/bin/sh
 # statuslines/bilingual-cn.sh
-# 中文 OPC 友好版本 · 显示：📁 项目 | ✨ 模型 | ctx | 🪙 今日 token | 北京时间
+# Chinese-localized variant. The script comments and code are English; the
+# rendered statusline labels are in Chinese (项目=project, 模型=model) and
+# the clock shows Beijing time (UTC+8). Use this when your terminal
+# audience reads Chinese.
+#
+# Output shape: 📁 <dir>  ✨ <model>  📊 <ctx%>  🪙 <today's tokens>  🕐 <Beijing HH:MM>
 input=$(cat)
 cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // "?"')
 model=$(echo "$input" | jq -r '.model.display_name // "?"')
@@ -23,7 +28,7 @@ fi
 
 fmt_tok() { awk -v n="$1" 'BEGIN { if (n >= 1000) printf "%.1fk", n/1000; else printf "%d", n }'; }
 
-# 北京时间（UTC+8）
+# Beijing time (UTC+8)
 beijing=$(TZ='Asia/Shanghai' date '+%H:%M')
 
 out="📁 $dir  ✨ $model"
