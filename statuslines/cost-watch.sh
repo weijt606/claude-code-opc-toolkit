@@ -26,6 +26,7 @@ cost_since() {
     | xargs -L 50 cat 2>/dev/null \
     | jq -s --arg s "$since" --arg pi "$PI" --arg po "$PO" --arg pcw "$PCW" --arg pcr "$PCR" '
         ([ .[] | select(.type == "assistant" and .message.usage != null and (.timestamp // "") >= $s) ]
+        | unique_by(.requestId // "")
         | {
             i: (map(.message.usage.input_tokens // 0)                | add // 0),
             o: (map(.message.usage.output_tokens // 0)               | add // 0),

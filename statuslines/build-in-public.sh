@@ -25,6 +25,7 @@ if [ -d "$PROJ_DIR" ]; then
     | xargs -L 50 cat 2>/dev/null \
     | jq -s --arg s "$day_start" '
         [.[] | select(.type == "assistant" and .message.usage != null and (.timestamp // "") >= $s)]
+        | unique_by(.requestId // "")
         | map(.message.usage.output_tokens // 0) | add // 0
       ' 2>/dev/null)
 fi
