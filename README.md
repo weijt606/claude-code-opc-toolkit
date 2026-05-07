@@ -69,11 +69,12 @@ cc-resume                     # fzf picker — pick any past session, Enter to r
 ### Token usage & cost: `cc-limits`
 
 ```bash
-cc-limits                     # live processes + 5h / 24h / 7d aggregates
-cc-limits --days 30 --watch
+cc-limits                          # live processes + 5h / 24h / 7d aggregates
+cc-limits --days 30 --watch        # wider window + auto-refresh
+cc-limits --plan max20             # add plan-aware budget block (see below)
 ```
 
-Pricing defaults assume Opus 4 published rates. Override per-call:
+**Pricing override** — defaults assume Opus 4. Override per-call:
 
 ```bash
 # Sonnet 4
@@ -83,7 +84,27 @@ CC_PRICE_INPUT=3 CC_PRICE_OUTPUT=15 CC_PRICE_CACHE_WRITE=3.75 CC_PRICE_CACHE_REA
 CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5  CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ=0.10 cc-limits
 ```
 
-> Claude Code does not expose its internal rate-limit counter — the 5h aggregate is a proxy, not authoritative quota state. On Claude Pro/Max the cost line is "value extracted at API rates", not a real bill.
+**Plan-aware budget** — set `CC_PLAN` (or pass `--plan`) to see estimated 5-hour budget %, burn rate, and reset countdown:
+
+```bash
+export CC_PLAN=max20      # or: pro | max5 | team | free | api
+cc-limits
+
+# Output gains a sub-block under "Last 5 hours":
+#
+#     Claude Max (20×)  (CC_PLAN=max20)   ⚠ estimated, not authoritative
+#     Usage:    624 / ~900 msgs   ██████████░░░░  69%
+#     Burn:     125 msg/hr  →  exhaust in ~2h 12m
+#     Resets:   in 1h 47m  (when oldest msg falls out of 5h window)
+```
+
+Override the cap when Anthropic adjusts published quotas:
+
+```bash
+export CC_PLAN_MSG_LIMIT_5H=1500   # or: cc-limits --plan max20 --quota 1500
+```
+
+> ⚠️ **Anthropic does not expose subscription quota state via any public API.** The plan budget block is a *local-data approximation*: 5h message count ÷ community-known published cap. Useful as a guardrail, **not** authoritative — server-side throttling can hit earlier or later than the bar suggests. On Claude Pro/Max the cost line shows "value at API rates", not a real bill.
 
 ### Daily worklog: `cc-daily`
 

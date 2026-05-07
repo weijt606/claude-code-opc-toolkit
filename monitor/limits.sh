@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.claude/monitor/limits.sh [--watch] [--days N]
+# ~/.claude/monitor/limits.sh [--watch] [--days N] [--plan NAME] [--quota N]
 # Claude Code usage / limits monitor.
 #
 # DATA SOURCES
@@ -15,6 +15,16 @@
 #     not Anthropic's authoritative quota state.
 #   * Pricing defaults assume Claude Opus 4 series (Anthropic published rates).
 #     Override with env vars (see PRICING below).
+#
+# PLAN-AWARE BUDGET (optional)
+#   Set CC_PLAN to one of: free | pro | max5 | max20 | team | api
+#     export CC_PLAN=max20            # or pass --plan max20
+#   This adds a "Plan budget" sub-block under the 5h section showing
+#   estimated usage %, burn rate, and reset countdown — all approximations
+#   from local data. Override the message cap with:
+#     export CC_PLAN_MSG_LIMIT_5H=900   # or pass --quota 900
+#   Defaults are best-effort community knowledge of Anthropic's published
+#   numbers and may drift; override when Anthropic changes them.
 
 PROJ_DIR="$HOME/.claude/projects"
 SESS_DIR="$HOME/.claude/sessions"
@@ -30,6 +40,22 @@ PRICE_OUTPUT="${CC_PRICE_OUTPUT:-75.00}"        # output_tokens
 PRICE_CACHE_WRITE="${CC_PRICE_CACHE_WRITE:-18.75}"  # cache_creation_input_tokens (5m default)
 PRICE_CACHE_READ="${CC_PRICE_CACHE_READ:-1.50}"     # cache_read_input_tokens
 
+# ── Plan-aware budget (optional, see PLAN-AWARE BUDGET note above) ──────────
+# Approximate published 5h message caps. These DRIFT — override per-shell or
+# per-call via CC_PLAN_MSG_LIMIT_5H / --quota when Anthropic changes them.
+plan_meta() {
+  case "$1" in
+    free)            echo "10|Claude Free" ;;
+    pro)             echo "225|Claude Pro" ;;
+    max5)            echo "225|Claude Max (5×)" ;;
+    max|max20)       echo "900|Claude Max (20×)" ;;
+    team)            echo "225|Claude Team (per seat)" ;;
+    api)             echo "0|Claude API (cost-based, no message cap)" ;;
+    "")              echo "" ;;
+    *)               echo "0|$1" ;;
+  esac
+}
+
 if [ -t 1 ] && [ -z "$NO_COLOR" ]; then
   C_DIM=$'\033[2m'; C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'
   C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_RED=$'\033[31m'
@@ -43,9 +69,11 @@ fi
 DAYS="${DAYS:-7}"
 while [ $# -gt 0 ]; do
   case "$1" in
-    --days) DAYS="$2"; shift 2 ;;
+    --days)  DAYS="$2"; shift 2 ;;
+    --plan)  CC_PLAN="$2"; shift 2 ;;
+    --quota) CC_PLAN_MSG_LIMIT_5H="$2"; shift 2 ;;
     --watch|-w) WATCH=1; shift ;;
-    --help|-h) sed -n '2,17p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    --help|-h) sed -n '2,28p' "$0" | sed 's/^# \?//'; exit 0 ;;
     *) shift ;;
   esac
 done
@@ -134,6 +162,108 @@ sum_all() {
       ' 2>/dev/null
 }
 
+# Earliest assistant-message timestamp in [since, now]. Empty if none.
+oldest_ts_in_window() {
+  local since="$1"
+  find "$PROJ_DIR" -maxdepth 2 -name '*.jsonl' -type f 2>/dev/null \
+    | xargs -L 50 -P 1 cat 2>/dev/null \
+    | jq -rs --arg since "$since" '
+        [ .[] | select(.type == "assistant" and .message.usage != null and (.timestamp // "") >= $since) | .timestamp ]
+        | min // ""
+      ' 2>/dev/null
+}
+
+# ISO8601 (with optional fractional seconds + Z) → epoch seconds, portable
+iso_to_epoch() {
+  local ts="$1"
+  [ -z "$ts" ] && return
+  # Strip fractional seconds and Z
+  local clean; clean=$(echo "$ts" | sed -E 's/\.[0-9]+Z?$//; s/Z$//')
+  date -u -j -f "%Y-%m-%dT%H:%M:%S" "$clean" +%s 2>/dev/null \
+    || date -u -d "$clean" +%s 2>/dev/null
+}
+
+human_dur() {
+  # seconds → "2h 18m" or "47m" or "0s" (cap at days for big values)
+  local s="$1"
+  if   [ "$s" -le 0 ];      then printf '0s'
+  elif [ "$s" -lt 60 ];     then printf '%ds' "$s"
+  elif [ "$s" -lt 3600 ];   then printf '%dm' $((s/60))
+  elif [ "$s" -lt 86400 ];  then printf '%dh %dm' $((s/3600)) $(((s%3600)/60))
+  else                           printf '%dd %dh' $((s/86400)) $(((s%86400)/3600))
+  fi
+}
+
+# Render plan-budget sub-block under the 5h section.
+# Args: $1 = m5 (messages in 5h window), $2 = since_5h ISO ts, $3 = now epoch
+plan_block() {
+  local m5="$1" since_5h="$2" now_epoch="$3"
+  local plan="${CC_PLAN:-}"
+  [ -z "$plan" ] && return
+
+  local meta; meta=$(plan_meta "$plan")
+  local quota label
+  quota=$(echo "$meta" | cut -d'|' -f1)
+  label=$(echo "$meta" | cut -d'|' -f2)
+  [ -n "${CC_PLAN_MSG_LIMIT_5H:-}" ] && quota="$CC_PLAN_MSG_LIMIT_5H"
+
+  printf '\n    %s%s%s' "$C_BOLD" "$label" "$C_RESET"
+  printf '  %s(CC_PLAN=%s)%s' "$C_DIM" "$plan" "$C_RESET"
+  printf '   %s⚠ estimated, not authoritative%s\n' "$C_YELLOW" "$C_RESET"
+
+  if [ "$quota" -le 0 ]; then
+    printf '    %s(no message cap on this plan — see cost line above)%s\n' "$C_DIM" "$C_RESET"
+    return
+  fi
+
+  # Usage bar
+  local pct color
+  pct=$(awk -v u="$m5" -v q="$quota" 'BEGIN { printf "%.0f", (u*100)/q }')
+  if   [ "$pct" -ge 80 ]; then color="$C_RED"
+  elif [ "$pct" -ge 50 ]; then color="$C_YELLOW"
+  else                         color="$C_GREEN"
+  fi
+  printf '    Usage:    %s%s%s / ~%s msgs   %s%s%s  %s%d%%%s\n' \
+    "$C_BOLD" "$m5" "$C_RESET" "$quota" \
+    "$color" "$(bar "$pct" 14)" "$C_RESET" \
+    "$color" "$pct" "$C_RESET"
+
+  # Burn rate + reset countdown — need oldest message in window
+  local oldest; oldest=$(oldest_ts_in_window "$since_5h")
+  if [ -z "$oldest" ] || [ "$m5" -le 0 ]; then
+    printf '    %s(no recent activity — full budget available)%s\n' "$C_DIM" "$C_RESET"
+    return
+  fi
+
+  local oldest_epoch; oldest_epoch=$(iso_to_epoch "$oldest")
+  if [ -z "$oldest_epoch" ]; then
+    return
+  fi
+
+  local window_age=$((now_epoch - oldest_epoch))
+  [ "$window_age" -lt 60 ] && window_age=60   # avoid div-by-zero on very fresh windows
+
+  local rate_per_hr; rate_per_hr=$(awk -v m="$m5" -v s="$window_age" 'BEGIN { printf "%.0f", (m*3600)/s }')
+  local remaining=$((quota - m5))
+
+  if [ "$remaining" -gt 0 ] && [ "$rate_per_hr" -gt 0 ]; then
+    local eta_sec; eta_sec=$(awk -v r="$remaining" -v rh="$rate_per_hr" 'BEGIN { printf "%.0f", (r*3600)/rh }')
+    printf '    Burn:     %s%s msg/hr%s  →  exhaust in ~%s\n' \
+      "$C_CYAN" "$rate_per_hr" "$C_RESET" "$(human_dur "$eta_sec")"
+  elif [ "$remaining" -le 0 ]; then
+    printf '    %sBudget exceeded (%s over)%s — server may already be throttling\n' \
+      "$C_RED" "$((m5 - quota))" "$C_RESET"
+  fi
+
+  # Window resets when oldest msg falls out of the rolling 5h
+  local reset_epoch=$((oldest_epoch + 5*3600))
+  local reset_in=$((reset_epoch - now_epoch))
+  if [ "$reset_in" -gt 0 ]; then
+    printf '    Resets:   %s in %s%s  %s(when oldest msg falls out of 5h window)%s\n' \
+      "$C_GREEN" "$(human_dur "$reset_in")" "$C_RESET" "$C_DIM" "$C_RESET"
+  fi
+}
+
 # ── Render one snapshot ─────────────────────────────────────────────────────
 render() {
   clear 2>/dev/null
@@ -208,6 +338,9 @@ render() {
     cost5=$(cost_of "$i5" "$o5" "$cc5" "$cr5")
     printf '    Messages: %-8s   Input: %-7s  Output: %-7s  Cache W: %-7s  Cache R: %-7s  ≈ %s\n' \
       "$m5" "$(fmt_n "$i5")" "$(fmt_n "$o5")" "$(fmt_n "$cc5")" "$(fmt_n "$cr5")" "$(fmt_usd "$cost5")"
+
+    # Optional plan-aware budget sub-block (rendered only when CC_PLAN is set)
+    plan_block "$m5" "$since_5h" "$now_epoch"
   fi
 
   # ── Today (last 24h) ──────────────────────────────────────────────────────
@@ -265,7 +398,8 @@ render() {
   printf '\n%sPricing assumes Opus 4 series%s %s(input $%.2f / output $%.2f / cache W $%.2f / cache R $%.2f per 1M)%s\n' \
     "$C_DIM" "$C_RESET" "$C_DIM" "$PRICE_INPUT" "$PRICE_OUTPUT" "$PRICE_CACHE_WRITE" "$PRICE_CACHE_READ" "$C_RESET"
   printf '%sOverride: CC_PRICE_INPUT=3 CC_PRICE_OUTPUT=15 cc-limits   (e.g. for Sonnet 4)%s\n' "$C_DIM" "$C_RESET"
-  printf '%scc-limits --watch%s = live mode  ·  %scc-limits --days 30%s = wider window\n' "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
+  printf '%scc-limits --watch%s = live mode  ·  %s--days 30%s = wider window  ·  %s--plan max20%s = plan-aware budget\n' \
+    "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
 }
 
 if [ "$WATCH" = 1 ]; then

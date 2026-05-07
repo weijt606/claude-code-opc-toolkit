@@ -69,11 +69,12 @@ cc-resume                     # fzf 选择 → 回任意历史 session
 ### Token 用量与费用：`cc-limits`
 
 ```bash
-cc-limits                     # 活跃进程 + 5h / 24h / 7d 聚合
-cc-limits --days 30 --watch   # 拓宽窗口 + 自动刷新
+cc-limits                          # 活跃进程 + 5h / 24h / 7d 聚合
+cc-limits --days 30 --watch        # 拓宽窗口 + 自动刷新
+cc-limits --plan max20             # 加上 plan-aware 预算块（见下）
 ```
 
-价格默认按 Opus 4 公开费率，可按调用覆盖：
+**价格覆盖** —— 默认按 Opus 4 公开费率：
 
 ```bash
 # Sonnet 4
@@ -83,7 +84,27 @@ CC_PRICE_INPUT=3 CC_PRICE_OUTPUT=15 CC_PRICE_CACHE_WRITE=3.75 CC_PRICE_CACHE_REA
 CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5  CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ=0.10 cc-limits
 ```
 
-> Claude Code 不暴露内部速率限制计数器，5h 聚合是从本地 transcript 算出的代理指标，**不是** Anthropic 的权威配额。订阅 Pro/Max 时，费用行展示的是"按 API 价格折算的价值"，不是真实账单。
+**Plan-aware 预算** —— 设置 `CC_PLAN`（或传 `--plan`），即可看到 5 小时滚动窗口的估算用量百分比、burn rate 与窗口重置倒计时：
+
+```bash
+export CC_PLAN=max20      # 可选值：pro | max5 | team | free | api
+cc-limits
+
+# "Last 5 hours" 下面会多出一段：
+#
+#     Claude Max (20×)  (CC_PLAN=max20)   ⚠ estimated, not authoritative
+#     Usage:    624 / ~900 msgs   ██████████░░░░  69%
+#     Burn:     125 msg/hr  →  exhaust in ~2h 12m
+#     Resets:   in 1h 47m  (when oldest msg falls out of 5h window)
+```
+
+Anthropic 调整配额时手动覆盖默认值：
+
+```bash
+export CC_PLAN_MSG_LIMIT_5H=1500   # 或：cc-limits --plan max20 --quota 1500
+```
+
+> ⚠️ **Anthropic 没有公开订阅档配额的 API**。这个 plan 预算块是**本地数据的近似估算**：5 小时窗口的 message 数 ÷ 社区已知的公开配额上限。把它当 guardrail，**不要**当权威 —— 实际限流可能早于或晚于进度条暗示。订阅 Pro/Max 时，费用行展示的是"按 API 价格折算的价值"，不是真实账单。
 
 ### 每日工作日志：`cc-daily`
 
