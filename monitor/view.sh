@@ -97,20 +97,24 @@ render() {
 
   # ── From hook event log (only meaningful after Claude Code restart) ───────
   if [ -f "$LOG_FILE" ] && [ -s "$LOG_FILE" ]; then
-    printf '\n%s📊  Prompts by project%s %s(last 7d, from hook log)%s\n' "$C_YELLOW" "$C_RESET" "$C_DIM" "$C_RESET"
+    # How many prompts you sent into each project's Claude Code session(s)
+    # over the last 7 days. A rough activity meter — "where did my Claude
+    # time actually go this week?".
+    printf '\n%s📊  Your prompt count, by project%s %s(last 7d — how active you were in each project)%s\n' "$C_YELLOW" "$C_RESET" "$C_DIM" "$C_RESET"
     jq -r --arg since "$since_7d" '
       select(.event == "UserPromptSubmit" and .ts >= $since) | (.cwd // "unknown")
     ' "$LOG_FILE" 2>/dev/null | sort | uniq -c | sort -rn | head -8 | sed "s/^/    /"
 
-    printf '\n%s🤖  Subagents finished%s %s(last 24h, from hook log)%s\n' "$C_CYAN" "$C_RESET" "$C_DIM" "$C_RESET"
+    printf '\n%s🤖  Subagents finished%s %s(last 24h — time · agent type · session · project)%s\n' "$C_CYAN" "$C_RESET" "$C_DIM" "$C_RESET"
     local sub_count
     sub_count=$(jq -r --arg since "$since_24h" 'select(.event == "SubagentStop" and .ts >= $since) | .ts' "$LOG_FILE" 2>/dev/null | wc -l | tr -d ' ')
     if [ "$sub_count" = "0" ]; then
       printf '    %s(none in window)%s\n' "$C_DIM" "$C_RESET"
     else
       jq -r --arg since "$since_24h" '
+        def nz(v;d): if (v // "") == "" then d else v end;
         select(.event == "SubagentStop" and .ts >= $since)
-        | "    \(.ts | .[11:19])  \(.agent_type // "?")  \((.session_id // "?") | .[0:8])"
+        | "    \(.ts | .[11:19])  \(nz(.agent_type;"?") | tostring)  ·  sid \(nz(.session_id;"?") | .[0:8])  ·  \(nz(.cwd;"?") | tostring | split("/") | last)"
       ' "$LOG_FILE" 2>/dev/null | tail -10
     fi
   else

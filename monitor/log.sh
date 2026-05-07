@@ -13,18 +13,23 @@ TS="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 # Try jq path first; on any failure, write a minimal raw line so we never lose the event.
 if command -v jq >/dev/null 2>&1; then
-  echo "$INPUT" | jq -c --arg ts "$TS" --arg event "$EVENT" '{
-    ts: $ts,
-    event: $event,
-    session_id: (.session_id // null),
-    cwd: (.cwd // null),
-    source: (.source // null),
-    transcript_path: (.transcript_path // null),
-    prompt_preview: ((.prompt // "") | tostring | .[0:80]),
-    agent_type: (.agent_type // null),
-    tool_name: (.tool_name // null),
-    hook_event_name: (.hook_event_name // null)
-  }' >> "$LOG_FILE" 2>/dev/null \
+  # nz: coerce both null and empty-string to null. Claude Code's hook payloads
+  # sometimes use "" for missing fields (notably .agent_type on SubagentStop),
+  # which would otherwise render as a blank column in cc-status.
+  echo "$INPUT" | jq -c --arg ts "$TS" --arg event "$EVENT" '
+    def nz(v): if (v // "") == "" then null else v end;
+    {
+      ts: $ts,
+      event: $event,
+      session_id: nz(.session_id),
+      cwd: nz(.cwd),
+      source: nz(.source),
+      transcript_path: nz(.transcript_path),
+      prompt_preview: ((.prompt // "") | tostring | .[0:80]),
+      agent_type: nz(.agent_type),
+      tool_name: nz(.tool_name),
+      hook_event_name: nz(.hook_event_name)
+    }' >> "$LOG_FILE" 2>/dev/null \
     || printf '{"ts":"%s","event":"%s","raw":"jq_failed"}\n' "$TS" "$EVENT" >> "$LOG_FILE"
 else
   printf '{"ts":"%s","event":"%s","raw":"no_jq"}\n' "$TS" "$EVENT" >> "$LOG_FILE"
