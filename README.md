@@ -31,7 +31,8 @@ Built and tested on macOS / zsh. **This is a workshop, not a product** — I'll 
 | **Event Tail** | `cc-tail` | ✅ | Live `tail -f` the event log with `jq` pretty-print. Useful while debugging new hooks. |
 | **Limits / Usage Monitor** | `cc-limits` | ✅ | Aggregate token usage across all transcripts: live process context sizes, last 5h / 24h / N-day windows, top sessions, estimated cost. |
 | **Skill Scaffolder** | `cc-skill-init <name>` | ✅ | Generate a fully-structured Claude Code skill at `.claude/skills/<name>/` (or `~/.claude/skills/` with `--global`) — frontmatter, Step-0 read-context block, README, prompts, templates/examples dirs. `--opc` shortcut auto-wires reading `product-marketing-context.md` first. |
-| `more coming…` | — | 🚧 | Daily worklog writer (`cc-daily`), statusline gallery, slash-command kits. PRs welcome. |
+| **Daily Worklog** | `cc-daily` | ✅ | Per-project `<project_root>/daily-worklog.md` auto-written from today's transcripts: totals, prompts, subagents, est cost. Optional `--export obsidian` / `--export notion` / `--global-summary`. |
+| `more coming…` | — | 🚧 | Statusline gallery, slash-command kits. PRs welcome. |
 
 ---
 
@@ -43,7 +44,8 @@ claude-code-opc-toolkit/
 │   ├── log.sh         # Hook stdin → events.jsonl (never blocks the harness)
 │   ├── view.sh        # Dashboard: active + recent sessions, prompt counts, subagents
 │   ├── resume.sh      # fzf picker → claude --resume <id>
-│   └── limits.sh      # Token usage + estimated cost across all transcripts
+│   ├── limits.sh      # Token usage + estimated cost across all transcripts
+│   └── daily.sh       # Per-project daily-worklog.md writer (Obsidian/Notion export)
 ├── skills/
 │   └── skill-init.sh  # Scaffold a new Claude Code skill in 1 command
 ├── settings.example.json   # 4 hooks ready to merge into ~/.claude/settings.json
@@ -253,6 +255,91 @@ The `SKILL.md` already has the `Step 0 · Context check` block wired with your `
 | `--global` | Create at `~/.claude/skills/` instead of `./.claude/skills/` |
 | `--force` | Overwrite an existing skill dir |
 | `-y, --yes` | Skip overwrite confirmation |
+
+### `cc-daily` — auto-generate per-project daily worklog
+
+End of day, you've worked on 4 projects across 12 sessions. You want to remember:
+- What did I actually ask Claude today (per project)?
+- Where am I picking up tomorrow?
+- How much did I spend in tokens?
+
+`cc-daily` reads today's transcripts, groups them by project, and prepends a dated section to **`<project_root>/daily-worklog.md`** in each project. Single file per project, newest day on top, grows over time, **never overwrites your handwritten notes** within a section unless you re-run for that exact day.
+
+```bash
+# Default: write today's section to every project that had activity
+cc-daily
+
+# Specific date
+cc-daily 2026-05-06
+
+# Only the current project (cwd)
+cc-daily --here
+
+# Only one project by path
+cc-daily --project /Users/me/dev/tapinflow
+
+# Preview without writing
+cc-daily --dry-run
+
+# ALSO write a unified cross-project summary to Obsidian
+CC_OBSIDIAN_VAULT="$HOME/Library/.../obsidian" \
+CC_OBSIDIAN_DAILY_PATH="Daily Notes" \
+  cc-daily --export obsidian
+
+# ALSO push to Notion (requires integration token + DB)
+NOTION_API_KEY=secret_xxx NOTION_DB_ID=xxx cc-daily --export notion
+```
+
+Sample written section (in `<project_root>/daily-worklog.md`):
+
+```markdown
+## 2026-05-07
+
+**Sessions**: 2 · **Messages**: 35 · **Tokens out**: 142k · **Subagents**: 3 · **Est ≈** $42.18
+
+### What I worked on
+
+<!-- Fill in 1-2 sentences while it's still fresh in your head. -->
+
+### Session ff76b1dc
+ **22 msgs** · out **89.3k** · cache R **12.4M** · est ≈ **$28.10**
+
+**Top prompts**
+
+- `09:42` Stripe webhook returns 502 in production but works locally...
+- `11:15` Add idempotency key to checkout flow before deploying...
+
+### Subagents fired
+
+- `11:23` Explore (sid ff76b1dc)
+- `14:35` claude-code-guide (sid ff76b1dc)
+
+### Lessons / next
+
+<!-- 1-2 things you learned. 1 thing to pick up tomorrow. -->
+```
+
+**How it composes with other tools:**
+- The `What I worked on` and `Lessons / next` blocks are intentional placeholders — fill them in by hand for context that the transcript can't capture.
+- Re-running `cc-daily` for the same date **replaces only that day's section**; everything you wrote in other days stays untouched.
+- Run it nightly via `launchd` (macOS) or `cron` for fully automatic worklog.
+
+**Automation example (launchd, macOS):**
+
+```xml
+<!-- ~/Library/LaunchAgents/com.user.ccdaily.plist -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.user.ccdaily</string>
+  <key>ProgramArguments</key>
+  <array><string>/Users/YOU/.claude/monitor/daily.sh</string></array>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
+</dict></plist>
+```
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.user.ccdaily.plist
+```
 
 ---
 

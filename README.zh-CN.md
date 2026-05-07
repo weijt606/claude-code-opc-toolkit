@@ -31,7 +31,8 @@ macOS / zsh 实测。**这是一个工坊，不是一个成品** —— 我会�
 | **事件流 tail** | `cc-tail` | ✅ | 实时尾随事件流，jq 高亮。加新 hook 时排错用 |
 | **用量 / 限额监控** | `cc-limits` | ✅ | 聚合所有 transcript 的 token 用量：live process 上下文大小、5h / 24h / N 天窗口、top session、估算费用 |
 | **Skill 脚手架** | `cc-skill-init <name>` | ✅ | 一行命令生成结构完整的 Claude Code skill 在 `.claude/skills/<name>/`（或 `~/.claude/skills/` 加 `--global`）—— 含 frontmatter、Step-0 读上下文区块、README、prompts、templates/examples 目录。`--opc` 快捷模式自动写入"先读 product-marketing-context.md"约定 |
-| `更多在路上…` | — | 🚧 | 每日 worklog 写手 (`cc-daily`)、statusline 模板库、slash-command 套件。欢迎 PR |
+| **每日 Worklog** | `cc-daily` | ✅ | 给每个项目的根目录自动写 `daily-worklog.md`，把今天的 transcript 汇总成一段：总览数据、prompts、subagents、估算费用。可选 `--export obsidian` / `--export notion` / `--global-summary` |
+| `更多在路上…` | — | 🚧 | statusline 模板库、slash-command 套件。欢迎 PR |
 
 ---
 
@@ -43,7 +44,8 @@ claude-code-opc-toolkit/
 │   ├── log.sh         # 接 hook stdin → 写 events.jsonl（永不阻塞 harness）
 │   ├── view.sh        # 仪表盘：active / recent session、prompt 计数、subagent 活动
 │   ├── resume.sh      # fzf 选择器 → claude --resume <id>
-│   └── limits.sh      # 跨所有 transcript 的 token 用量 + 估算费用
+│   ├── limits.sh      # 跨所有 transcript 的 token 用量 + 估算费用
+│   └── daily.sh       # 每个项目自动写 daily-worklog.md（可导出 Obsidian / Notion）
 ├── skills/
 │   └── skill-init.sh  # 一行命令生成新的 Claude Code skill
 ├── settings.example.json   # 可直接 merge 进 ~/.claude/settings.json 的 4 个 hook
@@ -252,6 +254,91 @@ cc-skill-init my-utility --global
 | `--global` | 放到 `~/.claude/skills/` 而不是 `./.claude/skills/` |
 | `--force` | 覆盖已存在的 skill 目录 |
 | `-y, --yes` | 跳过覆盖确认 |
+
+### `cc-daily` —— 每个项目自动写 daily worklog
+
+一天结束你跑了 4 个项目、12 个 session。你想知道：
+- 我今天到底问了 Claude 什么（按项目分）？
+- 明天接着做什么？
+- 烧了多少 token？
+
+`cc-daily` 读取今天的所有 transcript，按项目分组，给每个项目的 **`<项目根目录>/daily-worklog.md`** 顶部 prepend 一段当日内容。每个项目一份单独文件，新日期在最上面，长期累加，**重跑同一天只会覆盖那天的 section，不动你手写的其他内容**。
+
+```bash
+# 默认：给每个有活动的项目写今天的 section
+cc-daily
+
+# 指定日期
+cc-daily 2026-05-06
+
+# 只处理当前项目（cwd）
+cc-daily --here
+
+# 只处理某个项目路径
+cc-daily --project /Users/me/dev/tapinflow
+
+# 预览，不写文件
+cc-daily --dry-run
+
+# 同时把跨项目汇总写到 Obsidian vault
+CC_OBSIDIAN_VAULT="$HOME/Library/.../obsidian" \
+CC_OBSIDIAN_DAILY_PATH="Daily Notes" \
+  cc-daily --export obsidian
+
+# 同时推到 Notion（需要 integration token + DB）
+NOTION_API_KEY=secret_xxx NOTION_DB_ID=xxx cc-daily --export notion
+```
+
+写出来的 section 长这样（在 `<项目根目录>/daily-worklog.md`）：
+
+```markdown
+## 2026-05-07
+
+**Sessions**: 2 · **Messages**: 35 · **Tokens out**: 142k · **Subagents**: 3 · **Est ≈** $42.18
+
+### What I worked on
+
+<!-- 趁记忆还热，写 1-2 句"今天主要做了什么" -->
+
+### Session ff76b1dc
+ **22 msgs** · out **89.3k** · cache R **12.4M** · est ≈ **$28.10**
+
+**Top prompts**
+
+- `09:42` Stripe webhook 在生产返回 502 但本地正常...
+- `11:15` 部署前给 checkout 流程加 idempotency key...
+
+### Subagents fired
+
+- `11:23` Explore (sid ff76b1dc)
+- `14:35` claude-code-guide (sid ff76b1dc)
+
+### Lessons / next
+
+<!-- 学到 1-2 条 · 明天要接着做的 1 件事 -->
+```
+
+**关键设计**：
+- `What I worked on` 和 `Lessons / next` 是故意留的占位符 —— transcript 拿不到这种"语义层面"的内容，必须你手填
+- 重跑 `cc-daily` 同一日期 **只会替换那一天的 section**；其他天你手写的部分纹丝不动
+- 配 `launchd`（macOS）或 `cron` 每晚定时跑 → 完全自动化的 worklog
+
+**自动化示例（macOS launchd）**：
+
+```xml
+<!-- ~/Library/LaunchAgents/com.user.ccdaily.plist -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.user.ccdaily</string>
+  <key>ProgramArguments</key>
+  <array><string>/Users/YOU/.claude/monitor/daily.sh</string></array>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
+</dict></plist>
+```
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.user.ccdaily.plist
+```
 
 ---
 
