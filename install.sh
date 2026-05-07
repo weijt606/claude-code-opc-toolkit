@@ -45,6 +45,20 @@ if [ -d "$SKILLS_SRC" ]; then
   done
 fi
 
+# Statusline gallery — symlinked into ~/.claude/statuslines/, picked via `sl-<name>` aliases
+SL_SRC="$REPO_DIR/statuslines"
+SL_DST="$HOME/.claude/statuslines"
+if [ -d "$SL_SRC" ]; then
+  mkdir -p "$SL_DST"
+  for f in "$SL_SRC"/*.sh; do
+    [ -f "$f" ] || continue
+    base=$(basename "$f")
+    ln -sf "$f" "$SL_DST/$base"
+    say "$GREEN" "✓ symlinked $SL_DST/$base -> $f"
+  done
+  say "$DIM" "  Switch with: ln -sf $SL_DST/<name>.sh ~/.claude/statusline-command.sh"
+fi
+
 # ── 3. Append aliases (idempotent) ───────────────────────────────────────────
 RC_FILE=""
 if [ -f "$HOME/.zshrc" ]; then RC_FILE="$HOME/.zshrc"
@@ -62,6 +76,22 @@ alias cc-limits='$HOME/.claude/monitor/limits.sh'
 alias cc-daily='$HOME/.claude/monitor/daily.sh'
 alias cc-tail='tail -f $HOME/.claude/monitor/events.jsonl | jq'
 alias cc-skill-init='$HOME/.claude/skills-bin/skill-init.sh'
+
+# statusline switchers (run, then restart Claude Code or open a new session)
+alias sl-default='ln -sf $HOME/.claude/statuslines/default-opc.sh $HOME/.claude/statusline-command.sh && echo "→ default-opc"'
+alias sl-cost='ln -sf $HOME/.claude/statuslines/cost-watch.sh $HOME/.claude/statusline-command.sh && echo "→ cost-watch"'
+alias sl-session='ln -sf $HOME/.claude/statuslines/session-density.sh $HOME/.claude/statusline-command.sh && echo "→ session-density"'
+alias sl-pomo='ln -sf $HOME/.claude/statuslines/pomodoro.sh $HOME/.claude/statusline-command.sh && echo "→ pomodoro"'
+alias sl-minimal='ln -sf $HOME/.claude/statuslines/minimal.sh $HOME/.claude/statusline-command.sh && echo "→ minimal"'
+alias sl-bip='ln -sf $HOME/.claude/statuslines/build-in-public.sh $HOME/.claude/statusline-command.sh && echo "→ build-in-public"'
+alias sl-cn='ln -sf $HOME/.claude/statuslines/bilingual-cn.sh $HOME/.claude/statusline-command.sh && echo "→ bilingual-cn"'
+
+# pomodoro helpers (state at ~/.claude/monitor/pomodoro.state)
+alias cc-pomo-start='_f(){ printf "%s %s\n" "$(date +%s)" "$*" > $HOME/.claude/monitor/pomodoro.state; }; _f'
+alias cc-pomo-stop='rm -f $HOME/.claude/monitor/pomodoro.state'
+
+# build-in-public last-post timestamp
+alias cc-bip-posted='date -u +%Y-%m-%dT%H:%M:%SZ > $HOME/.claude/monitor/last-x-post && echo "BIP timestamp updated"'
 EOF
 )
 

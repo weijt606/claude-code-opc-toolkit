@@ -32,7 +32,8 @@ Built and tested on macOS / zsh. **This is a workshop, not a product** — I'll 
 | **Limits / Usage Monitor** | `cc-limits` | ✅ | Aggregate token usage across all transcripts: live process context sizes, last 5h / 24h / N-day windows, top sessions, estimated cost. |
 | **Skill Scaffolder** | `cc-skill-init <name>` | ✅ | Generate a fully-structured Claude Code skill at `.claude/skills/<name>/` (or `~/.claude/skills/` with `--global`) — frontmatter, Step-0 read-context block, README, prompts, templates/examples dirs. `--opc` shortcut auto-wires reading `product-marketing-context.md` first. |
 | **Daily Worklog** | `cc-daily` | ✅ | Per-project `<project_root>/daily-worklog.md` auto-written from today's transcripts: totals, prompts, subagents, est cost. Optional `--export obsidian` / `--export notion` / `--global-summary`. |
-| `more coming…` | — | 🚧 | Statusline gallery, slash-command kits. PRs welcome. |
+| **Statusline Gallery** | `sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session` | ✅ | 7 plug-and-play `statusLine` templates — daily driver, cost-watch, multi-session density, Pomodoro, Build-in-Public, minimal, 中文双语版。`sl-<name>` 一键切换 |
+| `more coming…` | — | 🚧 | Slash-command kits, hook templates, voice-of-customer miner, more skills scaffolds. PRs welcome. |
 
 ---
 
@@ -48,6 +49,14 @@ claude-code-opc-toolkit/
 │   └── daily.sh       # Per-project daily-worklog.md writer (Obsidian/Notion export)
 ├── skills/
 │   └── skill-init.sh  # Scaffold a new Claude Code skill in 1 command
+├── statuslines/        # 7 plug-and-play statusLine templates (sl-* aliases)
+│   ├── default-opc.sh
+│   ├── cost-watch.sh
+│   ├── session-density.sh
+│   ├── pomodoro.sh
+│   ├── minimal.sh
+│   ├── build-in-public.sh
+│   └── bilingual-cn.sh
 ├── settings.example.json   # 4 hooks ready to merge into ~/.claude/settings.json
 └── install.sh         # One-shot: symlinks scripts + adds aliases
 ```
@@ -339,6 +348,33 @@ Sample written section (in `<project_root>/daily-worklog.md`):
 
 ```bash
 launchctl load ~/Library/LaunchAgents/com.user.ccdaily.plist
+```
+
+### Statusline gallery — `sl-default` / `sl-cost` / `sl-pomo` / etc.
+
+7 templates living under [`statuslines/`](./statuslines/) — see the [gallery README](./statuslines/README.md) for full details. The `install.sh` registers `sl-*` aliases so you can swap with one keystroke:
+
+```bash
+sl-default   # 📁 dir  ⎇ branch  ✨ model  ctx N%        (daily driver)
+sl-cost      # ✨ model  ctx N%  ⏰5h $X  📅24h $Y       (high-intensity days)
+sl-session   # 📁 dir  sid:xxx  🟢 live 3/8  🤖 12       (multi-agent workflows)
+sl-pomo      # 🍅 task  📁 dir  ⏱  18:42 focus           (focus mode)
+sl-minimal   # model · dir                               (narrow terminals)
+sl-bip       # 📁 dir  🪙 142k  💬 35  🐦 6h            (Build-in-Public)
+sl-cn        # 📁 项目  ✨ 模型  📊 N%  🪙 142k  🕐 14:30 (中文 + 北京时间)
+```
+
+Pomodoro helpers:
+
+```bash
+cc-pomo-start "fix Stripe webhook 502"   # 25 min focus → 5 min break
+cc-pomo-stop                             # cancel
+```
+
+Build-in-Public last-post timestamp:
+
+```bash
+cc-bip-posted   # run after every X / LinkedIn post — statusline shows ⚠ if > 24h ago
 ```
 
 ---

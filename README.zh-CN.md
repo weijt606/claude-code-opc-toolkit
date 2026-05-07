@@ -32,7 +32,8 @@ macOS / zsh 实测。**这是一个工坊，不是一个成品** —— 我会�
 | **用量 / 限额监控** | `cc-limits` | ✅ | 聚合所有 transcript 的 token 用量：live process 上下文大小、5h / 24h / N 天窗口、top session、估算费用 |
 | **Skill 脚手架** | `cc-skill-init <name>` | ✅ | 一行命令生成结构完整的 Claude Code skill 在 `.claude/skills/<name>/`（或 `~/.claude/skills/` 加 `--global`）—— 含 frontmatter、Step-0 读上下文区块、README、prompts、templates/examples 目录。`--opc` 快捷模式自动写入"先读 product-marketing-context.md"约定 |
 | **每日 Worklog** | `cc-daily` | ✅ | 给每个项目的根目录自动写 `daily-worklog.md`，把今天的 transcript 汇总成一段：总览数据、prompts、subagents、估算费用。可选 `--export obsidian` / `--export notion` / `--global-summary` |
-| `更多在路上…` | — | 🚧 | statusline 模板库、slash-command 套件。欢迎 PR |
+| **Statusline 模板库** | `sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session` | ✅ | 7 套即插即用的 `statusLine` 脚本 —— 日常通用、烧钱监控、多 session 密度、番茄钟、Build-in-Public、极简、中文双语版。`sl-<name>` 一行切换 |
+| `更多在路上…` | — | 🚧 | slash-command 套件、hook 模板、客户原话挖矿器、更多 skill 脚手架。欢迎 PR |
 
 ---
 
@@ -48,6 +49,14 @@ claude-code-opc-toolkit/
 │   └── daily.sh       # 每个项目自动写 daily-worklog.md（可导出 Obsidian / Notion）
 ├── skills/
 │   └── skill-init.sh  # 一行命令生成新的 Claude Code skill
+├── statuslines/        # 7 套即插即用 statusLine（sl-* alias 一键切换）
+│   ├── default-opc.sh
+│   ├── cost-watch.sh
+│   ├── session-density.sh
+│   ├── pomodoro.sh
+│   ├── minimal.sh
+│   ├── build-in-public.sh
+│   └── bilingual-cn.sh
 ├── settings.example.json   # 可直接 merge 进 ~/.claude/settings.json 的 4 个 hook
 └── install.sh         # 一键：软链脚本 + 加 alias
 ```
@@ -338,6 +347,33 @@ NOTION_API_KEY=secret_xxx NOTION_DB_ID=xxx cc-daily --export notion
 
 ```bash
 launchctl load ~/Library/LaunchAgents/com.user.ccdaily.plist
+```
+
+### Statusline 模板库 —— `sl-default` / `sl-cost` / `sl-pomo` 等
+
+7 套模板放在 [`statuslines/`](./statuslines/)，详见 [gallery README](./statuslines/README.md)。`install.sh` 自动注册 `sl-*` alias，一行切换：
+
+```bash
+sl-default   # 📁 dir  ⎇ branch  ✨ model  ctx N%         (日常通用)
+sl-cost      # ✨ model  ctx N%  ⏰5h $X  📅24h $Y         (高强度日烧钱监控)
+sl-session   # 📁 dir  sid:xxx  🟢 live 3/8  🤖 12         (多 agent 协同)
+sl-pomo      # 🍅 task  📁 dir  ⏱  18:42 focus              (番茄钟专注)
+sl-minimal   # model · dir                                  (窄终端)
+sl-bip       # 📁 dir  🪙 142k  💬 35  🐦 6h               (Build-in-Public)
+sl-cn        # 📁 项目  ✨ 模型  📊 N%  🪙 142k  🕐 14:30   (中文 + 北京时间)
+```
+
+番茄钟 helper：
+
+```bash
+cc-pomo-start "修 Stripe webhook 502"   # 25 分钟 focus → 5 分钟 break
+cc-pomo-stop                            # 取消
+```
+
+Build-in-Public 最近发帖时间戳：
+
+```bash
+cc-bip-posted   # 每次 X / LinkedIn 发帖后跑 —— 超过 24h 状态栏会显示 ⚠
 ```
 
 ---
