@@ -1,18 +1,23 @@
 # claude-code-opc-toolkit
 
-[![English](https://img.shields.io/badge/lang-English-lightgrey?style=flat-square)](./README.md)
-[![中文](https://img.shields.io/badge/lang-%E4%B8%AD%E6%96%87-DC2626?style=flat-square)](./README.zh-CN.md)
-[![Built for Claude Code](https://img.shields.io/badge/built_for-Claude%20Code-D97757?style=flat-square)](https://claude.com/claude-code)
-[![License: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](./LICENSE)
+<p align="center">
+  <a href="./README.md"><img src="https://img.shields.io/badge/lang-English-lightgrey?style=flat-square" alt="English"></a>
+  <a href="./README.zh-CN.md"><img src="https://img.shields.io/badge/lang-%E4%B8%AD%E6%96%87-DC2626?style=flat-square" alt="中文"></a>
+  &nbsp;
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/built_for-Claude%20Code-D97757?style=flat-square" alt="Built for Claude Code"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License: MIT"></a>
+</p>
 
-[![tools](https://img.shields.io/badge/tools-6-blue?style=flat-square)](#工具)
-[![statuslines](https://img.shields.io/badge/statuslines-7-7C3AED?style=flat-square)](./statuslines/)
-[![hooks](https://img.shields.io/badge/hooks-4-D97757?style=flat-square)](./settings.example.json)
-[![GitHub stars](https://img.shields.io/github/stars/weijt606/claude-code-opc-toolkit?style=flat-square&color=yellow)](https://github.com/weijt606/claude-code-opc-toolkit/stargazers)
+<p align="center">
+  <a href="#工具"><img src="https://img.shields.io/badge/tools-6-blue?style=flat-square" alt="6 tools"></a>
+  <a href="./statuslines/"><img src="https://img.shields.io/badge/statuslines-7-7C3AED?style=flat-square" alt="7 statuslines"></a>
+  <a href="./settings.example.json"><img src="https://img.shields.io/badge/hooks-4-D97757?style=flat-square" alt="4 hooks"></a>
+  <a href="https://github.com/weijt606/claude-code-opc-toolkit/stargazers"><img src="https://img.shields.io/github/stars/weijt606/claude-code-opc-toolkit?style=flat-square&color=yellow" alt="GitHub stars"></a>
+</p>
 
-> 给独立全栈 AI 开发者用的 Claude Code 效率工具集 —— **One-Person Company / Solo Founder / Solo Builder**。
+> 为独立全栈 AI 开发者打造的 Claude Code 效率工具集 —— **One-Person Company / Solo Founder / Solo Builder**。
 
-一个持续生长的工坊，把我日常 Claude Code 工作流里反复用到的小工具沉淀进来：跨 session 可观测性、一键 resume、token 用量、skill 脚手架、每日 worklog、statusline 模板。欢迎 issue 和 PR。
+一个持续打磨的工具工坊，沉淀我日常 Claude Code 工作流里反复用到的小工具：跨 session 可观测性、一键回到任意历史 session、token 用量与费用追踪、Skill 脚手架、每日工作日志、状态栏模板。欢迎提 issue 和 PR。
 
 ---
 
@@ -24,29 +29,29 @@ cd claude-code-opc-toolkit
 ./install.sh
 source ~/.zshrc
 
-cc-status        # 看所有 Claude Code session
-cc-resume        # fzf 选择 → 回到任意历史 session
-cc-limits        # 跨所有 transcript 的 token 用量 + 估算费用
+cc-status        # 总览所有 Claude Code session
+cc-resume        # 用 fzf 选回任意历史 session
+cc-limits        # 跨所有 transcript 的 token 用量与估算费用
 ```
 
-依赖：`bash`、`jq`、`fzf`。macOS：`brew install jq fzf`。
+依赖：`bash`、`jq`、`fzf`。macOS 一键装：`brew install jq fzf`。
 
-要拿到 prompt 计数和 subagent 跟踪，把 [`settings.example.json`](./settings.example.json) 里的 `hooks` 块 merge 进 `~/.claude/settings.json`，然后在 Claude Code 输入 `/hooks` 重载（或重启）。
+要开启 prompt 计数与 subagent 追踪，把 [`settings.example.json`](./settings.example.json) 中的 `hooks` 块合并进 `~/.claude/settings.json`，然后在 Claude Code 里输入 `/hooks` 重载（或重启 Claude Code）。
 
 ---
 
 ## 工具
 
-| 工具 | 状态 | 做什么 |
-|------|:----:|--------|
-| `cc-status` / `cc-watch` | ✅ | 跨项目 session 仪表盘。`cc-watch` 实时刷新（默认 30s，`REFRESH_INTERVAL=5` 调更紧）|
-| `cc-resume` | ✅ | fzf 选择器跨所有历史 session，按时间倒序 → `claude --resume <id>` |
-| `cc-limits` | ✅ | Token 用量 + 估算费用：live 进程、5h / 24h / N 天窗口、top session |
-| `cc-daily` | ✅ | 给每个项目自动写 `daily-worklog.md`，可选 `--export obsidian` / `--export notion` |
-| `cc-skill-init <name>` | ✅ | 一行命令在 `.claude/skills/<name>/` 生成完整 skill 脚手架（含 Step-0 读上下文模式）|
-| `cc-tail` | ✅ | `tail -f` hook 事件流 + jq 高亮 |
-| Statusline 模板库 | ✅ | 7 套即插即用 `statusLine`，`sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session` 一行切换。详见 [`statuslines/`](./statuslines/) |
-| Hook 事件流 | ✅ | `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` → `~/.claude/monitor/events.jsonl` |
+| 工具 | 状态 | 功能 |
+|------|:----:|------|
+| `cc-status` / `cc-watch` | ✅ | 跨项目的 session 仪表盘。`cc-watch` 自动刷新（默认 30 秒，`REFRESH_INTERVAL=5` 可调更紧）|
+| `cc-resume` | ✅ | 跨硬盘所有项目历史 session 的 fzf 选择器，按时间倒序，回车直达 `claude --resume <id>` |
+| `cc-limits` | ✅ | Token 用量与估算费用：当前活跃进程的上下文大小、5h / 24h / N 日窗口、消耗 top session |
+| `cc-daily` | ✅ | 给每个项目自动写 `daily-worklog.md`；可选 `--export obsidian` / `--export notion` 同步到外部 |
+| `cc-skill-init <name>` | ✅ | 一行命令在 `.claude/skills/<name>/` 生成完整 Skill 脚手架（含 frontmatter、Step-0 读上下文区块）|
+| `cc-tail` | ✅ | 实时 `tail -f` Hook 事件流，jq 自动高亮 |
+| Statusline 模板库 | ✅ | 7 套即插即用的 `statusLine`，`sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session` 一键切换。详见 [`statuslines/`](./statuslines/) |
+| Hook 事件流 | ✅ | `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` 事件全部写入 `~/.claude/monitor/events.jsonl` |
 
 ---
 
@@ -55,20 +60,20 @@ cc-limits        # 跨所有 transcript 的 token 用量 + 估算费用
 ### Session 管理
 
 ```bash
-cc-status                     # 一次快照
+cc-status                     # 一次性快照
 cc-watch                      # 自动刷新（默认 30 秒）
 REFRESH_INTERVAL=5 cc-watch   # 5 秒一刷（盯紧时用）
-cc-resume                     # fzf 选 → 回任意历史 session
+cc-resume                     # fzf 选择 → 回任意历史 session
 ```
 
-### Token 用量 & 费用：`cc-limits`
+### Token 用量与费用：`cc-limits`
 
 ```bash
-cc-limits                     # live 进程 + 5h / 24h / 7d 聚合
-cc-limits --days 30 --watch
+cc-limits                     # 活跃进程 + 5h / 24h / 7d 聚合
+cc-limits --days 30 --watch   # 拓宽窗口 + 自动刷新
 ```
 
-价格默认按 Opus 4 公开费率，可覆盖：
+价格默认按 Opus 4 公开费率，可按调用覆盖：
 
 ```bash
 # Sonnet 4
@@ -78,81 +83,93 @@ CC_PRICE_INPUT=3 CC_PRICE_OUTPUT=15 CC_PRICE_CACHE_WRITE=3.75 CC_PRICE_CACHE_REA
 CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5  CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ=0.10 cc-limits
 ```
 
-> Claude Code 不暴露内部速率限制计数器，5h 聚合是 *代理指标* 不是权威配额。订阅 Pro/Max 的话，费用是"按 API 价格折算的价值"，不是实际账单。
+> Claude Code 不暴露内部速率限制计数器，5h 聚合是从本地 transcript 算出的代理指标，**不是** Anthropic 的权威配额。订阅 Pro/Max 时，费用行展示的是"按 API 价格折算的价值"，不是真实账单。
 
-### 每日 worklog：`cc-daily`
-
-```bash
-cc-daily                      # 给每个有活动的项目写今天的 section
-cc-daily 2026-05-06           # 指定日期（YYYY-MM-DD, UTC）
-cc-daily --here               # 只处理当前项目
-cc-daily --dry-run            # 预览，不写文件
-cc-daily --export obsidian    # 同时写到 $CC_OBSIDIAN_VAULT/Daily Notes/<date>.md
-cc-daily --export notion      # 同时推到 $NOTION_DB_ID（需要 $NOTION_API_KEY）
-```
-
-每个项目一个累积式 `<项目根目录>/daily-worklog.md`，新日期 prepend 到顶部。重跑同一天**只覆盖那天的 section**，你手写的内容纹丝不动。
-
-### 新建 skill：`cc-skill-init`
+### 每日工作日志：`cc-daily`
 
 ```bash
-cc-skill-init voc-collect -d "每周挖客户原话" --opc
-cc-skill-init seo-write -d "从 voice + 大纲起草 SEO 长文" --reads .agents/voice-of-customer.md
-cc-skill-init my-utility --global         # 放到 ~/.claude/skills/ 而不是项目本地
+cc-daily                      # 给每个有活动的项目写今日 section
+cc-daily 2026-05-06           # 指定日期（YYYY-MM-DD，UTC）
+cc-daily --here               # 仅处理当前目录所属的项目
+cc-daily --dry-run            # 仅预览，不写文件
+cc-daily --export obsidian    # 同步写到 $CC_OBSIDIAN_VAULT/Daily Notes/<date>.md
+cc-daily --export notion      # 同步推到 $NOTION_DB_ID（需要 $NOTION_API_KEY）
 ```
 
-生成完整 skill 结构（带 frontmatter + `Step 0 · Context check` 的 `SKILL.md`、`README.md`、`prompts/starter.md`、空的 `templates/` 和 `examples/`）。
+每个项目维护一份累积式 `<项目根目录>/daily-worklog.md`，新日期 prepend 到顶部。**对同一日期重跑只会替换那一天的 section**，其他日子里你手写的内容完全不动。
 
-### Statusline
+### 一行命令新建 Skill：`cc-skill-init`
 
 ```bash
-sl-default       # 📁 dir  ⎇ branch  ✨ model  ctx N%
-sl-cost          # ✨ model  ctx N%  ⏰5h $X  📅24h $Y
-sl-session       # 📁 dir  sid:xxx  🟢 live 3/8  🤖 12
-sl-pomo          # 🍅 task  📁 dir  ⏱  18:42 focus
-sl-bip           # 📁 dir  🪙 142k  💬 35  🐦 6h
-sl-cn            # 📁 项目  ✨ 模型  📊 N%  🪙 142k  🕐 14:30
-sl-minimal       # model · dir
+cc-skill-init voc-collect -d "每周从 Reddit/G2/X 挖客户原话" --opc
+cc-skill-init seo-write -d "依据 voice + 大纲起草 SEO 长文" --reads .agents/voice-of-customer.md
+cc-skill-init my-utility --global         # 放到 ~/.claude/skills/，所有项目可用
 ```
 
-番茄钟：`cc-pomo-start "任务名"` / `cc-pomo-stop`。BIP：`cc-bip-posted` 每次 X / LinkedIn 发完帖跑一次（超 24h 状态栏会显示 ⚠）。
+生成完整的 Skill 结构：带 frontmatter 与 `Step 0 · Context check` 的 `SKILL.md`、面向人的 `README.md`、起手 prompt、空的 `templates/` 与 `examples/` 目录。
 
-完整 gallery + 自定义说明：[`statuslines/README.md`](./statuslines/README.md)。
+### 状态栏模板库
+
+7 套即插即用的 `statusLine` 脚本。每套都是单文件 shell：读 Claude Code 通过 stdin 传入的 JSON（`.workspace.current_dir`、`.model.display_name`、`.context_window.used_percentage`），输出一行简洁字符串。`sl-*` 别名一键切换，**切换后需重启 Claude Code session 才会生效**。
+
+| 别名 | 显示内容 | 适用场景 |
+|------|---------|---------|
+| `sl-default` | `📁 dir  ⎇ branch  ✨ model  ctx N%` | **日常通用** —— 信息密度合适，不杂乱 |
+| `sl-cost` | `✨ model  ctx N%  ⏰5h $X  📅24h $Y` | **高强度编码日** —— 把 token 花费摆在眼前（用 `CC_PRICE_*` 环境变量调整价格）|
+| `sl-session` | `📁 dir  sid:xxx  🟢 live 3/8  🤖 12` | **多 session 协同** —— 看活跃进程数 + 今日 subagent 触发数 |
+| `sl-pomo` | `🍅 task  📁 dir  ⏱  18:42 focus` | **专注模式** —— 25 分钟专注 / 5 分钟休息的番茄钟，带任务名 |
+| `sl-bip` | `📁 dir  🪙 142k  💬 35  🐦 6h` | **Build-in-Public 创作者** —— 上次发帖超 24 小时会显示 ⚠ 提醒 |
+| `sl-cn` | `📁 项目  ✨ 模型  📊 N%  🪙 142k  🕐 14:30` | **国内 OPC** —— 中文 + 北京时间 + 今日 token 总量 |
+| `sl-minimal` | `model · dir` | 极简党 / 终端窄的人 |
+
+**番茄钟**状态保存在 `~/.claude/monitor/pomodoro.state`：
+
+```bash
+cc-pomo-start "修 Stripe webhook 502"   # 开启一个专注块
+cc-pomo-stop                            # 取消
+# 默认 25 分钟专注、5 分钟休息 —— 用 CC_POMO_FOCUS / CC_POMO_BREAK（秒）覆盖
+```
+
+**Build-in-Public** 上次发帖时间戳保存在 `~/.claude/monitor/last-x-post`：
+
+```bash
+cc-bip-posted   # X / LinkedIn 发完帖跑一次 —— 超 24 小时状态栏会显示 ⚠ 提醒
+```
+
+每个 statusline 大约 50 行 bash。想自定义？复制 [`statuslines/`](./statuslines/) 里的任意一个，改 `printf` 输出，把你的 `.sh` 放在同目录，再用 `ln -sf` 接到 `~/.claude/statusline-command.sh` 即可。完整 gallery 文档 + stdin 字段参考：[`statuslines/README.md`](./statuslines/README.md)。
 
 ---
 
 ## Hooks（可选）
 
-加上才有 prompt 计数和 subagent 跟踪。把 [`settings.example.json`](./settings.example.json) 的 `hooks` 块 merge 进 `~/.claude/settings.json`，输入 `/hooks` 重载或重启。
+加上才有 prompt 计数与 subagent 追踪。把 [`settings.example.json`](./settings.example.json) 的 `hooks` 块合并进 `~/.claude/settings.json`，再在 Claude Code 里 `/hooks` 重载或重启。
 
-⚠️ 新 hooks **不在当前 session 生效**，只对新启动的 session 起作用。
+⚠️ 新 hooks **不会在当前 session 生效**，只对之后启动的新 session 起作用。
 
 ---
 
 ## 注意事项
 
-- **速率限制**：Claude Code 的内部计数器不公开；`cc-limits` 的 5h 块是代理指标。
-- **隐私**：`events.jsonl` 和 transcript 文件含 prompt 前缀和完整 cwd 路径 —— **不要 push 到公开仓库**。
-- **macOS / zsh 实测**；BSD/GNU `stat` 已自动适配 Linux，但未实际验证。
+- **速率限制**：Claude Code 内部计数器不公开；`cc-limits` 的 5h 块是代理指标。
+- **隐私**：`events.jsonl` 与 transcript 文件包含 prompt 前缀和完整 cwd 路径 —— **不要 push 到公开仓库**。
+- **平台**：在 macOS / zsh 实测过；BSD 与 GNU `stat` 已自动适配 Linux，但暂未实测。
 
 ---
 
-## 谁适合用
+## 适合谁用
 
-独立全栈 AI 开发者，同时跑多个 Claude Code session 的人。你叫自己什么都行 —— **OPC**、**Solo Founder**、**Solo Builder**、**Indie Hacker**、**Vibe Coder** —— 同一类问题，同一套工具。
+同时跑多个 Claude Code session 的独立全栈 AI 开发者。无论你叫自己什么 —— **OPC**、**Solo Founder**、**Solo Builder**、**Indie Hacker**、**Vibe Coder** —— 同一类问题，同一套工具。
 
-只有你 + Claude Code 作为工程杠杆时，可观测性比团队场景更重要。这个工具集替代那个不存在的队友，给你一份仪表盘。
+一个人 + Claude Code 当工程团队的时候，可观测性比团队场景更重要。这套工具替代那个不存在的队友，给你一份仪表盘。
 
 ---
 
 ## 贡献
 
-欢迎 PR。收录标准：*"明天我自己也会装到 `~/.claude/` 里吗？"* —— 实用至上，观点鲜明优于面面俱到。Bug 反馈和提问同样欢迎。
+欢迎 PR。收录标准只有一句：*"明天我自己也会装到 `~/.claude/` 里吗？"* —— 实用至上，观点鲜明优于面面俱到。Bug 反馈和提问同样欢迎。
 
 ---
 
 ## License
 
 [MIT](./LICENSE) —— 随便用、随便 fork、随便 ship。
-
-—— [@weijt606](https://github.com/weijt606) · 是 OPC 工具箱的一部分，与个人 Obsidian 知识图谱（vibe-coding-bible / GTM 知识谱系 / deployment handbook）配套。

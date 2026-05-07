@@ -1,14 +1,19 @@
 # claude-code-opc-toolkit
 
-[![English](https://img.shields.io/badge/lang-English-2962FF?style=flat-square)](./README.md)
-[![中文](https://img.shields.io/badge/lang-%E4%B8%AD%E6%96%87-lightgrey?style=flat-square)](./README.zh-CN.md)
-[![Built for Claude Code](https://img.shields.io/badge/built_for-Claude%20Code-D97757?style=flat-square)](https://claude.com/claude-code)
-[![License: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](./LICENSE)
+<p align="center">
+  <a href="./README.md"><img src="https://img.shields.io/badge/lang-English-2962FF?style=flat-square" alt="English"></a>
+  <a href="./README.zh-CN.md"><img src="https://img.shields.io/badge/lang-%E4%B8%AD%E6%96%87-lightgrey?style=flat-square" alt="中文"></a>
+  &nbsp;
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/built_for-Claude%20Code-D97757?style=flat-square" alt="Built for Claude Code"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License: MIT"></a>
+</p>
 
-[![tools](https://img.shields.io/badge/tools-6-blue?style=flat-square)](#tools)
-[![statuslines](https://img.shields.io/badge/statuslines-7-7C3AED?style=flat-square)](./statuslines/)
-[![hooks](https://img.shields.io/badge/hooks-4-D97757?style=flat-square)](./settings.example.json)
-[![GitHub stars](https://img.shields.io/github/stars/weijt606/claude-code-opc-toolkit?style=flat-square&color=yellow)](https://github.com/weijt606/claude-code-opc-toolkit/stargazers)
+<p align="center">
+  <a href="#tools"><img src="https://img.shields.io/badge/tools-6-blue?style=flat-square" alt="6 tools"></a>
+  <a href="./statuslines/"><img src="https://img.shields.io/badge/statuslines-7-7C3AED?style=flat-square" alt="7 statuslines"></a>
+  <a href="./settings.example.json"><img src="https://img.shields.io/badge/hooks-4-D97757?style=flat-square" alt="4 hooks"></a>
+  <a href="https://github.com/weijt606/claude-code-opc-toolkit/stargazers"><img src="https://img.shields.io/github/stars/weijt606/claude-code-opc-toolkit?style=flat-square&color=yellow" alt="GitHub stars"></a>
+</p>
 
 > Claude Code productivity toolkit for solo full-stack AI developers — **One-Person Company / Solo Founder / Solo Builder**.
 
@@ -105,19 +110,33 @@ Generates a complete skill structure (`SKILL.md` with frontmatter and `Step 0 ·
 
 ### Statusline gallery
 
+7 plug-and-play `statusLine` scripts. Each is a single shell file that reads Claude Code's stdin JSON (`.workspace.current_dir`, `.model.display_name`, `.context_window.used_percentage`) and prints one short line. `sl-*` aliases swap the active statusline with one keystroke — restart the Claude Code session for it to take effect.
+
+| Alias | Shows | Best for |
+|-------|-------|----------|
+| `sl-default` | `📁 dir  ⎇ branch  ✨ model  ctx N%` | **Daily driver** — info-rich without clutter |
+| `sl-cost` | `✨ model  ctx N%  ⏰5h $X  📅24h $Y` | **High-intensity days** — keep token spend visible (override pricing with `CC_PRICE_*` env vars) |
+| `sl-session` | `📁 dir  sid:xxx  🟢 live 3/8  🤖 12` | **Multi-session work** — see live process count and today's subagent fires |
+| `sl-pomo` | `🍅 task  📁 dir  ⏱  18:42 focus` | **Focus mode** — 25min focus / 5min break Pomodoro with task label |
+| `sl-bip` | `📁 dir  🪙 142k  💬 35  🐦 6h` | **Build-in-Public** creators — nudges with ⚠ when last post > 24h |
+| `sl-cn` | `📁 项目  ✨ 模型  📊 N%  🪙 142k  🕐 14:30` | **国内 OPC** — 中文 + 北京时间 + 今日 token |
+| `sl-minimal` | `model · dir` | Narrow terminals / minimalists |
+
+**Pomodoro** state lives at `~/.claude/monitor/pomodoro.state`:
+
 ```bash
-sl-default       # 📁 dir  ⎇ branch  ✨ model  ctx N%
-sl-cost          # ✨ model  ctx N%  ⏰5h $X  📅24h $Y
-sl-session       # 📁 dir  sid:xxx  🟢 live 3/8  🤖 12
-sl-pomo          # 🍅 task  📁 dir  ⏱  18:42 focus
-sl-bip           # 📁 dir  🪙 142k  💬 35  🐦 6h
-sl-cn            # 📁 项目  ✨ 模型  📊 N%  🪙 142k  🕐 14:30
-sl-minimal       # model · dir
+cc-pomo-start "fix Stripe webhook 502"   # start a focus block
+cc-pomo-stop                             # cancel
+# defaults: 25 min focus, 5 min break — override with CC_POMO_FOCUS / CC_POMO_BREAK in seconds
 ```
 
-Pomodoro: `cc-pomo-start "task name"` / `cc-pomo-stop`. BIP: `cc-bip-posted` after each X / LinkedIn post (statusline shows ⚠ if > 24h).
+**Build-in-Public** posting timestamp at `~/.claude/monitor/last-x-post`:
 
-Full gallery + customization guide: [`statuslines/README.md`](./statuslines/README.md).
+```bash
+cc-bip-posted   # run after each X / LinkedIn post — statusline shows ⚠ if > 24h ago
+```
+
+Each statusline is ~50 lines of bash. Want a custom one? Copy any of the existing scripts in [`statuslines/`](./statuslines/), tweak the `printf`, drop your `.sh` next to them, and `ln -sf` it into `~/.claude/statusline-command.sh`. Full gallery doc + stdin schema reference: [`statuslines/README.md`](./statuslines/README.md).
 
 ---
 
@@ -154,5 +173,3 @@ PRs welcome. The bar is *"would I install this in my own `~/.claude/` tomorrow?"
 ## License
 
 [MIT](./LICENSE) — use it, fork it, ship it.
-
-— [@weijt606](https://github.com/weijt606) · part of an OPC toolbox alongside personal Obsidian knowledge graphs (vibe-coding-bible, GTM playbook, deployment handbook).
