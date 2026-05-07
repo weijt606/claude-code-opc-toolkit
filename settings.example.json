@@ -1,0 +1,45 @@
+{
+  "_comment": "Merge the `hooks` block below into your ~/.claude/settings.json. After merging, run /hooks inside Claude Code to reload, or restart. New hooks DO NOT apply to the current session.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/monitor/log.sh SessionStart"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/monitor/log.sh SessionEnd"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/monitor/log.sh UserPromptSubmit"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/monitor/log.sh SubagentStop"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Local user data — never commit
+events.jsonl
+events-*.jsonl
+*.local.json
+.env
+.env.*
+
+# Test artifacts
+test-events.jsonl
+/tmp/
