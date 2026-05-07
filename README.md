@@ -69,10 +69,17 @@ cc-resume                     # fzf picker — pick any past session, Enter to r
 ### Token usage & cost: `cc-limits`
 
 ```bash
-cc-limits                          # live processes + 5h / 24h / 7d aggregates
-cc-limits --days 30 --watch        # wider window + auto-refresh
-cc-limits --plan max20             # add plan-aware budget block (see below)
+cc-limits                          # default: last 24 hours
+cc-limits -30m                     # last 30 minutes
+cc-limits -1h                      # last 1 hour
+cc-limits -7d                      # last 7 days
+cc-limits -30d                     # last 30 days
+cc-limits --last 6h                # long form
+cc-limits -7d --watch              # auto-refresh
+cc-limits --plan max5              # add plan-aware budget block (see below)
 ```
+
+Every window shows: live processes · aggregate metrics for the window (input / output / cache / cost / per-model) · plan budget if `CC_PLAN` is set (always 5h-anchored, regardless of window) · top sessions by output in the window.
 
 **Pricing override** — defaults assume Opus 4. Override per-call:
 

@@ -1,6 +1,22 @@
 #!/bin/bash
-# ~/.claude/monitor/limits.sh [--watch] [--days N] [--plan NAME] [--quota N]
+# ~/.claude/monitor/limits.sh [WINDOW] [--watch] [--plan NAME] [--quota N]
 # Claude Code usage / limits monitor.
+#
+# WINDOW (optional, defaults to last 24 hours)
+#     cc-limits              last 24 hours (default)
+#     cc-limits -30m         last 30 minutes
+#     cc-limits -1h          last 1 hour
+#     cc-limits -7d          last 7 days
+#     cc-limits -2w          last 2 weeks
+#     cc-limits -30d         last 30 days
+#     cc-limits --last 6h    long form (same as -6h)
+#     cc-limits --days 30    legacy spelling for -30d
+#
+#   Output for any window:
+#     🔥 Live processes (always)
+#     ⚡ Last <window>: aggregates + per-model breakdown + cost
+#     🎯 Plan budget (always 5h-anchored, only when CC_PLAN set)
+#     🏆 Top sessions by output in <window>
 #
 # DATA SOURCES
 #   1. ~/.claude/projects/*/*.jsonl     — every assistant message has .message.usage
@@ -84,18 +100,49 @@ else
   C_GREEN=""; C_YELLOW=""; C_RED=""; C_BLUE=""; C_CYAN=""; C_MAG=""
 fi
 
-# ── Helpers ─────────────────────────────────────────────────────────────────
+# ── Argument parsing ────────────────────────────────────────────────────────
 DAYS="${DAYS:-7}"
+WINDOW_SEC=""       # if set → single-window mode
+WINDOW_LABEL=""     # human label for the window
+
+# Parse a duration like "30m", "24h", "7d", "2w" → set WINDOW_SEC + WINDOW_LABEL
+parse_duration() {
+  local d="$1"
+  if [[ "$d" =~ ^([0-9]+)([mhdw])$ ]]; then
+    local n="${BASH_REMATCH[1]}"; local u="${BASH_REMATCH[2]}"
+    case "$u" in
+      m) WINDOW_SEC=$((n * 60));        WINDOW_LABEL="$n minute$([ "$n" -ne 1 ] && echo s)" ;;
+      h) WINDOW_SEC=$((n * 3600));      WINDOW_LABEL="$n hour$([ "$n" -ne 1 ] && echo s)" ;;
+      d) WINDOW_SEC=$((n * 86400));     WINDOW_LABEL="$n day$([ "$n" -ne 1 ] && echo s)" ;;
+      w) WINDOW_SEC=$((n * 7 * 86400)); WINDOW_LABEL="$n week$([ "$n" -ne 1 ] && echo s)" ;;
+    esac
+    return 0
+  fi
+  echo "error: invalid duration '$d' (use Nm/Nh/Nd/Nw, e.g. 30m, 24h, 7d, 2w)" >&2
+  exit 1
+}
+
 while [ $# -gt 0 ]; do
+  # Shorthand window: -30m, -24h, -7d, -2w
+  if [[ "$1" =~ ^-([0-9]+)([mhdw])$ ]]; then
+    parse_duration "${1#-}"
+    shift
+    continue
+  fi
   case "$1" in
-    --days)  DAYS="$2"; shift 2 ;;
+    --last)  parse_duration "$2"; shift 2 ;;
+    --days)  parse_duration "${2}d"; shift 2 ;;   # legacy; delegates to parse_duration
     --plan)  CC_PLAN="$2"; shift 2 ;;
     --quota) CC_PLAN_MSG_LIMIT_5H="$2"; shift 2 ;;
     --watch|-w) WATCH=1; shift ;;
-    --help|-h) sed -n '2,28p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    --help|-h) sed -n '2,40p' "$0" | sed 's/^# \?//'; exit 0 ;;
     *) shift ;;
   esac
 done
+
+# Default window: last 24 hours
+WINDOW_SEC="${WINDOW_SEC:-86400}"
+WINDOW_LABEL="${WINDOW_LABEL:-24 hours}"
 
 if stat -f %m "$0" >/dev/null 2>&1; then
   STAT_MTIME() { stat -f %m "$1" 2>/dev/null; }
@@ -287,10 +334,17 @@ plan_block() {
 render() {
   clear 2>/dev/null
   local now_epoch; now_epoch=$(date -u +%s)
-  local since_5h since_1d since_nd
-  since_5h=$(date -u -v-5H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d '5 hours ago' +"%Y-%m-%dT%H:%M:%SZ")
-  since_1d=$(date -u -v-1d +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d '1 day ago' +"%Y-%m-%dT%H:%M:%SZ")
-  since_nd=$(date -u -v-"${DAYS}"d +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "${DAYS} days ago" +"%Y-%m-%dT%H:%M:%SZ")
+
+  # Single window driven by WINDOW_SEC / WINDOW_LABEL (set in argparse).
+  local window_start_epoch=$((now_epoch - WINDOW_SEC))
+  local since_window
+  since_window=$(date -u -r "$window_start_epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null \
+                  || date -u -d "@$window_start_epoch" +"%Y-%m-%dT%H:%M:%SZ")
+
+  # Plan budget always anchors to 5h (rate-limit window), independent of WINDOW_SEC
+  local since_5h
+  since_5h=$(date -u -v-5H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null \
+              || date -u -d '5 hours ago' +"%Y-%m-%dT%H:%M:%SZ")
 
   printf '%s═══════════════════════════════════════════════════════════════════%s\n' "$C_BOLD" "$C_RESET"
   printf '%s   Claude Code Usage Monitor%s     %s\n' "$C_BOLD" "$C_RESET" "$(date '+%Y-%m-%d %H:%M:%S')"
@@ -342,66 +396,42 @@ render() {
   fi
   [ "$live_count" -eq 0 ] && printf '    %s(no live Claude Code processes)%s\n' "$C_DIM" "$C_RESET"
 
-  # ── Last 5 hours (rolling rate-limit window proxy) ────────────────────────
-  printf '\n%s⚡  Last 5 hours%s %s(rolling rate-limit window proxy — not authoritative)%s\n' "$C_YELLOW" "$C_RESET" "$C_DIM" "$C_RESET"
-  local agg5; agg5=$(sum_all "$since_5h")
-  if [ -z "$agg5" ]; then
+  # ── Window aggregate ──────────────────────────────────────────────────────
+  printf '\n%s⚡  Last %s%s\n' "$C_YELLOW" "$WINDOW_LABEL" "$C_RESET"
+  local agg; agg=$(sum_all "$since_window")
+  if [ -z "$agg" ]; then
     printf '    %s(no data)%s\n' "$C_DIM" "$C_RESET"
   else
-    local m5 i5 o5 cc5 cr5 cost5
-    m5=$(echo "$agg5"  | jq -r '.messages')
-    i5=$(echo "$agg5"  | jq -r '.input')
-    o5=$(echo "$agg5"  | jq -r '.output')
-    cc5=$(echo "$agg5" | jq -r '.cache_create')
-    cr5=$(echo "$agg5" | jq -r '.cache_read')
-    cost5=$(cost_of "$i5" "$o5" "$cc5" "$cr5")
+    local m i o cc cr cost
+    m=$(echo "$agg"  | jq -r '.messages')
+    i=$(echo "$agg"  | jq -r '.input')
+    o=$(echo "$agg"  | jq -r '.output')
+    cc=$(echo "$agg" | jq -r '.cache_create')
+    cr=$(echo "$agg" | jq -r '.cache_read')
+    cost=$(cost_of "$i" "$o" "$cc" "$cr")
     printf '    Messages: %-8s   Input: %-7s  Output: %-7s  Cache W: %-7s  Cache R: %-7s  ≈ %s\n' \
-      "$m5" "$(fmt_n "$i5")" "$(fmt_n "$o5")" "$(fmt_n "$cc5")" "$(fmt_n "$cr5")" "$(fmt_usd "$cost5")"
+      "$m" "$(fmt_n "$i")" "$(fmt_n "$o")" "$(fmt_n "$cc")" "$(fmt_n "$cr")" "$(fmt_usd "$cost")"
+    echo "$agg" | jq -r '.models | to_entries | map("    \(.value)× \(.key)") | .[]' 2>/dev/null
+  fi
 
-    # Optional plan-aware budget sub-block (rendered only when CC_PLAN is set)
+  # ── Plan budget (anchored to 5h rate-limit window, independent of WINDOW_SEC) ──
+  if [ -n "${CC_PLAN:-}" ]; then
+    printf '\n%s🎯  Plan budget%s %s(5h rolling rate-limit window)%s\n' "$C_MAG" "$C_RESET" "$C_DIM" "$C_RESET"
+    local agg5; agg5=$(sum_all "$since_5h")
+    local m5=0
+    [ -n "$agg5" ] && m5=$(echo "$agg5" | jq -r '.messages')
     plan_block "$m5" "$since_5h" "$now_epoch"
   fi
 
-  # ── Today (last 24h) ──────────────────────────────────────────────────────
-  printf '\n%s📊  Last 24 hours%s\n' "$C_BLUE" "$C_RESET"
-  local agg1; agg1=$(sum_all "$since_1d")
-  if [ -n "$agg1" ]; then
-    local m1 i1 o1 cc1 cr1 cost1
-    m1=$(echo "$agg1"  | jq -r '.messages')
-    i1=$(echo "$agg1"  | jq -r '.input')
-    o1=$(echo "$agg1"  | jq -r '.output')
-    cc1=$(echo "$agg1" | jq -r '.cache_create')
-    cr1=$(echo "$agg1" | jq -r '.cache_read')
-    cost1=$(cost_of "$i1" "$o1" "$cc1" "$cr1")
-    printf '    Messages: %-8s   Input: %-7s  Output: %-7s  Cache W: %-7s  Cache R: %-7s  ≈ %s\n' \
-      "$m1" "$(fmt_n "$i1")" "$(fmt_n "$o1")" "$(fmt_n "$cc1")" "$(fmt_n "$cr1")" "$(fmt_usd "$cost1")"
-    echo "$agg1" | jq -r '.models | to_entries | map("    \(.value)× \(.key)") | .[]' 2>/dev/null
-  fi
-
-  # ── Last N days ───────────────────────────────────────────────────────────
-  printf '\n%s📅  Last %d days%s\n' "$C_MAG" "$DAYS" "$C_RESET"
-  local aggn; aggn=$(sum_all "$since_nd")
-  if [ -n "$aggn" ]; then
-    local mn ina on ccn crn costn
-    mn=$(echo "$aggn"  | jq -r '.messages')
-    ina=$(echo "$aggn" | jq -r '.input')
-    on=$(echo "$aggn"  | jq -r '.output')
-    ccn=$(echo "$aggn" | jq -r '.cache_create')
-    crn=$(echo "$aggn" | jq -r '.cache_read')
-    costn=$(cost_of "$ina" "$on" "$ccn" "$crn")
-    printf '    Messages: %-8s   Input: %-7s  Output: %-7s  Cache W: %-7s  Cache R: %-7s  ≈ %s\n' \
-      "$mn" "$(fmt_n "$ina")" "$(fmt_n "$on")" "$(fmt_n "$ccn")" "$(fmt_n "$crn")" "$(fmt_usd "$costn")"
-  fi
-
-  # ── Top sessions in window (by output tokens) ─────────────────────────────
-  printf '\n%s🏆  Top sessions by output (last %d days)%s\n' "$C_GREEN" "$DAYS" "$C_RESET"
+  # ── Top sessions in window ────────────────────────────────────────────────
+  printf '\n%s🏆  Top sessions by output (last %s)%s\n' "$C_GREEN" "$WINDOW_LABEL" "$C_RESET"
   find "$PROJ_DIR" -maxdepth 2 -name '*.jsonl' -type f 2>/dev/null | while IFS= read -r f; do
     local mt; mt=$(STAT_MTIME "$f")
     [ -z "$mt" ] && continue
     local age=$((now_epoch - mt))
-    [ "$age" -gt $((DAYS * 86400)) ] && continue
+    [ "$age" -gt "$WINDOW_SEC" ] && continue
     local sid; sid=$(basename "$f" .jsonl)
-    local out; out=$(jq -s --arg since "$since_nd" '
+    local out; out=$(jq -s --arg since "$since_window" '
       map(select(.type == "assistant" and .message.usage != null and (.timestamp // "") >= $since))
       | map(.message.usage.output_tokens // 0) | add // 0
     ' "$f" 2>/dev/null)
@@ -416,9 +446,8 @@ render() {
   # ── Footer ────────────────────────────────────────────────────────────────
   printf '\n%sPricing assumes Opus 4 series%s %s(input $%.2f / output $%.2f / cache W $%.2f / cache R $%.2f per 1M)%s\n' \
     "$C_DIM" "$C_RESET" "$C_DIM" "$PRICE_INPUT" "$PRICE_OUTPUT" "$PRICE_CACHE_WRITE" "$PRICE_CACHE_READ" "$C_RESET"
-  printf '%sOverride: CC_PRICE_INPUT=3 CC_PRICE_OUTPUT=15 cc-limits   (e.g. for Sonnet 4)%s\n' "$C_DIM" "$C_RESET"
-  printf '%scc-limits --watch%s = live mode  ·  %s--days 30%s = wider window  ·  %s--plan max20%s = plan-aware budget\n' \
-    "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
+  printf '%sWindows%s: %s-30m · -1h · -24h (default) · -7d · -30d%s   %s+ --plan max5 · --watch%s\n' \
+    "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET" "$C_DIM" "$C_RESET"
 }
 
 if [ "$WATCH" = 1 ]; then

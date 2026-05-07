@@ -69,10 +69,17 @@ cc-resume                     # fzf 选择 → 回任意历史 session
 ### Token 用量与费用：`cc-limits`
 
 ```bash
-cc-limits                          # 活跃进程 + 5h / 24h / 7d 聚合
-cc-limits --days 30 --watch        # 拓宽窗口 + 自动刷新
-cc-limits --plan max20             # 加上 plan-aware 预算块（见下）
+cc-limits                          # 默认：最近 24 小时
+cc-limits -30m                     # 最近 30 分钟
+cc-limits -1h                      # 最近 1 小时
+cc-limits -7d                      # 最近 7 天
+cc-limits -30d                     # 最近 30 天
+cc-limits --last 6h                # 长写法
+cc-limits -7d --watch              # 自动刷新
+cc-limits --plan max5              # 加上 plan-aware 预算块（见下）
 ```
+
+任何窗口都展示：活跃进程 · 该窗口的聚合数据（input / output / cache / 费用 / 按模型分类）· plan 预算（设了 `CC_PLAN` 才有，**永远锚定 5h 滚动窗口**）· 该窗口内输出 token 最多的 top sessions。
 
 **价格覆盖** —— 默认按 Opus 4 公开费率：
 
