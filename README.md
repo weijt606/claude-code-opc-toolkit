@@ -20,6 +20,20 @@ Built and tested on macOS / zsh. **This is a workshop, not a product** — I'll 
 
 ---
 
+## Tool List
+
+| Tool | Command | Status | What it does |
+|------|---------|:------:|--------------|
+| **Session Monitor** | `cc-status` | ✅ | Cross-project Claude Code dashboard — active + recent sessions, prompt counts, subagent activity, real CWDs read from each transcript. |
+| **Live Watch** | `cc-watch` | ✅ | Same dashboard in auto-refresh mode (default 30s; set `REFRESH_INTERVAL=5` for tighter polling). |
+| **Resume Picker** | `cc-resume` | ✅ | `fzf` picker across every past session you've ever opened, sorted by recency. One Enter → `claude --resume <id>`. |
+| **Event Logger** | (auto via hooks) | ✅ | Hook-driven JSONL stream of `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop`. Source for cross-project analytics. |
+| **Event Tail** | `cc-tail` | ✅ | Live `tail -f` the event log with `jq` pretty-print. Useful while debugging new hooks. |
+| **Limits / Usage Monitor** | `cc-limits` | ✅ | Aggregate token usage across all transcripts: live process context sizes, last 5h / 24h / N-day windows, top sessions, estimated cost. |
+| `more coming…` | — | 🚧 | Skill scaffolds, statusline templates, slash-command kits, daily-summary writer to Obsidian. PRs welcome. |
+
+---
+
 ## What's inside
 
 ```
@@ -27,7 +41,8 @@ claude-code-opc-toolkit/
 ├── monitor/
 │   ├── log.sh         # Hook stdin → events.jsonl (never blocks the harness)
 │   ├── view.sh        # Dashboard: active + recent sessions, prompt counts, subagents
-│   └── resume.sh      # fzf picker → claude --resume <id>
+│   ├── resume.sh      # fzf picker → claude --resume <id>
+│   └── limits.sh      # Token usage + estimated cost across all transcripts
 ├── settings.example.json   # 4 hooks ready to merge into ~/.claude/settings.json
 └── install.sh         # One-shot: symlinks scripts + adds aliases
 ```
@@ -143,6 +158,49 @@ cc-tail
 ```
 
 Tail the JSONL with jq pretty-printing. Useful when adding new hooks or troubleshooting.
+
+### `cc-limits` — token usage & cost monitor
+
+```bash
+cc-limits                  # snapshot — last 5h / 24h / 7d aggregates + live processes
+cc-limits --days 30        # widen the window
+cc-limits --watch          # auto-refresh (default 60s)
+```
+
+Sample output:
+
+```
+🔥  Live processes (approx context size = last assistant turn input)
+    pid 12835   ff76b1dc      ctx 295.3k   busy   /Users/you/dev/agent-graph
+    pid 73628   2f9090dc      ctx 572.2k   idle   /Users/you/dev/agentagora
+
+⚡  Last 5 hours (rolling rate-limit window proxy — not authoritative)
+    Messages: 635   Input: 1.0k  Output: 1.4M  Cache W: 3.6M  Cache R: 229.9M  ≈ $520.17
+
+📊  Last 24 hours
+    Messages: 1396  Input: 3.0k  Output: 2.6M  ...                            ≈ $1245.29
+    1395× claude-opus-4-7
+
+🏆  Top sessions by output (last 7 days)
+    3.7M     28531e24   /Users/you/dev/tapinflow
+    1.8M     2f9090dc   /Users/you/dev/agentagora
+    ...
+```
+
+**Pricing override** (defaults assume Opus 4 published rates):
+
+```bash
+# Sonnet 4 family
+CC_PRICE_INPUT=3 CC_PRICE_OUTPUT=15 CC_PRICE_CACHE_WRITE=3.75 CC_PRICE_CACHE_READ=0.30 cc-limits
+
+# Haiku 4 family
+CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5 CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ=0.10 cc-limits
+```
+
+**Caveats:**
+- Claude Code does NOT expose its internal rate-limit counter. The "last 5h" block is a *proxy* aggregated from local transcripts, not Anthropic's authoritative quota state.
+- If you're on Claude Pro / Max (subscription), the cost line shows what you'd *otherwise* pay at API rates — useful as a "value extracted" metric, not a literal bill.
+- Synthetic / internal models (`<synthetic>`) are counted but cost-zero. Filter with jq if you need clean per-model totals.
 
 ---
 

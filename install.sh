@@ -28,7 +28,7 @@ done
 
 # ── 2. Symlink scripts ───────────────────────────────────────────────────────
 mkdir -p "$MONITOR_DST"
-for f in log.sh view.sh resume.sh; do
+for f in log.sh view.sh resume.sh limits.sh; do
   ln -sf "$MONITOR_SRC/$f" "$MONITOR_DST/$f"
   say "$GREEN" "✓ symlinked $MONITOR_DST/$f -> $MONITOR_SRC/$f"
 done
@@ -46,6 +46,7 @@ ALIAS_BLOCK=$(cat <<'EOF'
 alias cc-status='$HOME/.claude/monitor/view.sh'
 alias cc-watch='$HOME/.claude/monitor/view.sh --watch'
 alias cc-resume='$HOME/.claude/monitor/resume.sh'
+alias cc-limits='$HOME/.claude/monitor/limits.sh'
 alias cc-tail='tail -f $HOME/.claude/monitor/events.jsonl | jq'
 EOF
 )

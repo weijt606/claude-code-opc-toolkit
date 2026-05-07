@@ -1,7 +1,7 @@
 # claude-code-opc-toolkit
 
 [![English](https://img.shields.io/badge/lang-English-lightgrey?style=flat-square)](./README.md)
-[![中文](https://img.shields.io/badge/lang-%E4%B8%AD%E6%96%87-2962FF?style=flat-square)](./README.zh-CN.md)
+[![中文](https://img.shields.io/badge/lang-%E4%B8%AD%E6%96%87-DC2626?style=flat-square)](./README.zh-CN.md)
 [![Built for Claude Code](https://img.shields.io/badge/built_for-Claude%20Code-D97757?style=flat-square)](https://claude.com/claude-code)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](./LICENSE)
 
@@ -20,6 +20,20 @@ macOS / zsh 实测。**这是一个工坊，不是一个成品** —— 我会�
 
 ---
 
+## 工具列表
+
+| 工具 | 命令 | 状态 | 做什么 |
+|------|------|:----:|--------|
+| **Session 监控** | `cc-status` | ✅ | 跨项目 Claude Code 仪表盘 —— active + recent session、prompt 计数、subagent 活动，从每个 transcript 直接读真实 cwd。|
+| **实时刷新** | `cc-watch` | ✅ | 上面这个仪表盘的自动刷新版（默认 30 秒；`REFRESH_INTERVAL=5` 可调更紧）|
+| **Resume 选择器** | `cc-resume` | ✅ | `fzf` 选择器跨所有历史 session，按时间倒序。Enter 即跑 `claude --resume <id>` |
+| **事件记录器** | （hooks 自动写入）| ✅ | Hook 触发把 `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` 写到 JSONL，跨项目分析的数据源 |
+| **事件流 tail** | `cc-tail` | ✅ | 实时尾随事件流，jq 高亮。加新 hook 时排错用 |
+| **用量 / 限额监控** | `cc-limits` | ✅ | 聚合所有 transcript 的 token 用量：live process 上下文大小、5h / 24h / N 天窗口、top session、估算费用 |
+| `更多在路上…` | — | 🚧 | Skill 模板、statusline 套件、slash command 集、每日自动汇总到 Obsidian。欢迎 PR |
+
+---
+
 ## 仓库结构
 
 ```
@@ -27,7 +41,8 @@ claude-code-opc-toolkit/
 ├── monitor/
 │   ├── log.sh         # 接 hook stdin → 写 events.jsonl（永不阻塞 harness）
 │   ├── view.sh        # 仪表盘：active / recent session、prompt 计数、subagent 活动
-│   └── resume.sh      # fzf 选择器 → claude --resume <id>
+│   ├── resume.sh      # fzf 选择器 → claude --resume <id>
+│   └── limits.sh      # 跨所有 transcript 的 token 用量 + 估算费用
 ├── settings.example.json   # 可直接 merge 进 ~/.claude/settings.json 的 4 个 hook
 └── install.sh         # 一键：软链脚本 + 加 alias
 ```
@@ -142,6 +157,49 @@ cc-tail
 ```
 
 实时尾随 JSONL，jq 高亮。加新 hook 时验证有没有触发。
+
+### `cc-limits` —— Token 用量 & 费用监控
+
+```bash
+cc-limits                  # 快照 —— 5h / 24h / 7d 聚合 + live 进程
+cc-limits --days 30        # 拉宽窗口
+cc-limits --watch          # 自动刷新（默认 60 秒）
+```
+
+输出示例：
+
+```
+🔥  Live processes (approx context size = last assistant turn input)
+    pid 12835   ff76b1dc      ctx 295.3k   busy   /Users/you/dev/agent-graph
+    pid 73628   2f9090dc      ctx 572.2k   idle   /Users/you/dev/agentagora
+
+⚡  Last 5 hours (rolling rate-limit window proxy — not authoritative)
+    Messages: 635   Input: 1.0k  Output: 1.4M  Cache W: 3.6M  Cache R: 229.9M  ≈ $520.17
+
+📊  Last 24 hours
+    Messages: 1396  Input: 3.0k  Output: 2.6M  ...                            ≈ $1245.29
+    1395× claude-opus-4-7
+
+🏆  Top sessions by output (last 7 days)
+    3.7M     28531e24   /Users/you/dev/tapinflow
+    1.8M     2f9090dc   /Users/you/dev/agentagora
+    ...
+```
+
+**价格覆盖**（默认按 Opus 4 series 公开价格）：
+
+```bash
+# Sonnet 4 系列
+CC_PRICE_INPUT=3 CC_PRICE_OUTPUT=15 CC_PRICE_CACHE_WRITE=3.75 CC_PRICE_CACHE_READ=0.30 cc-limits
+
+# Haiku 4 系列
+CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5 CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ=0.10 cc-limits
+```
+
+**注意事项**：
+- Claude Code **不暴露内部的速率限制计数器**。"Last 5 hours" 那块是 *从本地 transcript 聚合出来的代理指标*，不是 Anthropic 权威配额。
+- 如果你用的是 Claude Pro / Max 订阅制，费用行显示的是"按 API 价格折算"的金额 —— 用来衡量你从订阅里榨出多少价值，不是实际账单。
+- 合成 / 内部模型（`<synthetic>`）会被计入 message 数但不计费。如需干净的 per-model 数据，用 jq 过滤即可。
 
 ---
 
