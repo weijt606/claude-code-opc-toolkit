@@ -1,4 +1,8 @@
-# claude-code-opc-toolkit
+<p align="center">
+  <img src="./banner.svg" alt="Claude-Code OPC Toolkit" width="100%" />
+</p>
+
+<h1 align="center">Claude-Code OPC Toolkit</h1>
 
 <p align="center">
   <a href="./README.md"><img src="https://img.shields.io/badge/lang-English-lightgrey?style=flat-square" alt="English"></a>
