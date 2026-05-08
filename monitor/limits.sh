@@ -594,17 +594,28 @@ if [ -n "$CALIBRATE_PCT" ]; then
     echo "error: set CC_PLAN first (or --plan max5) so we know what plan you're calibrating" >&2
     exit 1
   fi
-  # Need session count to back-compute cap
+  # Need current-tumbling-window count to back-compute cap.
+  # MUST use the same window math as plan_block(), otherwise the calibrated
+  # cap is computed off a different baseline than the display block reads.
   now_epoch=$(date -u +%s)
-  since_5h=$(date -u -v-5H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d '5 hours ago' +"%Y-%m-%dT%H:%M:%SZ")
-  ss=$(session_start_ts "$since_5h")
-  if [ -z "$ss" ]; then
-    echo "error: no recent activity in the 5h window — can't calibrate without a baseline" >&2
+  anchor=$(anchor_ts)
+  if [ -z "$anchor" ]; then
+    echo "error: no recent activity — can't calibrate without a baseline" >&2
     exit 1
   fi
+  anchor_epoch=$(iso_to_epoch "$anchor")
+  if [ -z "$anchor_epoch" ]; then
+    echo "error: could not resolve anchor timestamp '$anchor'" >&2
+    exit 1
+  fi
+  elapsed=$((now_epoch - anchor_epoch))
+  window_n=$((elapsed / (5 * 3600)))
+  window_start_epoch=$((anchor_epoch + window_n * 5 * 3600))
+  window_start_iso=$(date -u -r "$window_start_epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null \
+                      || date -u -d "@$window_start_epoch" +"%Y-%m-%dT%H:%M:%SZ")
   m_session=$(find "$PROJ_DIR" -maxdepth 2 -name '*.jsonl' -type f 2>/dev/null \
     | xargs -L 50 -P 1 cat 2>/dev/null \
-    | jq -rs --arg since "$ss" '
+    | jq -rs --arg since "$window_start_iso" '
         [.[] | select(.type == "assistant" and .message.usage != null and (.timestamp // "") >= $since) | (.requestId // "")]
         | unique | map(select(. != "")) | length' 2>/dev/null)
   [ -z "$m_session" ] && m_session=0
