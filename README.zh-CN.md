@@ -17,7 +17,7 @@
 
 > 为独立全栈 AI 开发者打造的 Claude Code 效率工具集 —— **One-Person Company / Solo Founder / Solo Builder**。
 
-一个持续打磨的工具工坊，沉淀我日常 Claude Code 工作流里反复用到的小工具：跨 session 可观测性、一键回到任意历史 session、token 用量与费用追踪、Skill 脚手架、每日工作日志、状态栏模板。欢迎提 issue 和 PR。
+这是一个持续打磨的工坊，把我日常 Claude Code 工作流里反复要用的小工具沉淀进来：跨 session 可观测、一键回到任意历史 session、token 用量与费用追踪、Skill 脚手架、每日工作日志、状态栏模板。欢迎提 issue 和 PR。
 
 ---
 
@@ -36,7 +36,7 @@ cc-limits        # 跨所有 transcript 的 token 用量与估算费用
 
 依赖：`bash`、[`jq`](https://stedolan.github.io/jq/)（命令行 JSON 处理工具）、[`fzf`](https://github.com/junegunn/fzf)（终端交互式模糊选择器）。macOS 一键装：`brew install jq fzf`。
 
-要开启 prompt 计数与 subagent 追踪，把 [`settings.example.json`](./settings.example.json) 中的 `hooks` 块合并进 `~/.claude/settings.json`，然后在 Claude Code 里输入 `/hooks` 重载（或重启 Claude Code）。
+要开启 prompt 计数与 subagent 追踪，把 [`settings.example.json`](./settings.example.json) 里的 `hooks` 块并入你的 `~/.claude/settings.json`，再在 Claude Code 里输入 `/hooks` 重载（或重启）。
 
 ---
 
@@ -44,15 +44,15 @@ cc-limits        # 跨所有 transcript 的 token 用量与估算费用
 
 | 工具 | 状态 | 功能 |
 |------|:----:|------|
-| `cc-status` / `cc-watch` | ✅ | 跨项目的 session 仪表盘。`cc-watch` 自动刷新（默认 30 秒，`REFRESH_INTERVAL=5` 可调更紧）|
-| `cc-resume` | ✅ | 模糊搜索式选择器（基于 `fzf`），跨硬盘所有项目的历史 session 按时间倒序，回车直达 `claude --resume <id>` |
-| `cc-limits` | ✅ | Token 用量与估算费用：当前活跃进程的上下文大小、5h / 24h / N 日窗口、消耗 top session |
+| `cc-status` / `cc-watch` | ✅ | 跨项目的 session 仪表盘。`cc-watch` 自动刷新（默认 30 秒，可用 `REFRESH_INTERVAL=5` 缩短刷新间隔）|
+| `cc-resume` | ✅ | 用 `fzf` 模糊搜索所有项目的历史 session（按时间倒序），选中回车即跳转到 `claude --resume <id>` |
+| `cc-limits` | ✅ | Token 用量与估算费用：当前活跃进程的上下文大小、5h / 24h / N 天窗口聚合、消耗 token 最多的 session |
 | `cc-daily` | ✅ | 给每个项目自动写 `daily-worklog.md`；可选 `--export obsidian` / `--export notion` 同步到外部 |
 | `cc-skill-init <name>` | ✅ | 一行命令在 `.claude/skills/<name>/` 生成完整 Skill 脚手架（含 frontmatter、Step-0 读上下文区块）|
-| `cc-pilot suggest` | ✅ | 扫描历史 transcript，从你手动批准过 ≥ 5 次的 Bash 命令推导 `permissions.allow` 规则。拒绝破坏性模式；被拦截时附触发的具体命令 |
-| `cc-pilot safe` / `dev` / `yolo` | ✅ | 用指定权限 profile 启动 Claude Code：`safe`（只读）/ `dev`（safe + 构建/测试 + 可回滚 git）/ `yolo`（`--dangerously-skip-permissions`，启动前强制 git 干净 + 非主分支）。Profile 是 [`pilot/profiles/`](./pilot/profiles/) 下的纯文本文件 |
-| `cc-tail` | ✅ | 实时 `tail -f` Hook 事件流，jq 自动高亮 |
-| Statusline 模板库 | ✅ | 7 套即插即用的 `statusLine`，`sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session` 一键切换。详见 [`statuslines/`](./statuslines/) |
+| `cc-pilot suggest` | ✅ | 扫描历史 transcript，找出你手动批准过 ≥ 5 次的 Bash 命令，据此推导 `permissions.allow` 规则。破坏性模式会被自动拦截，并附上触发拦截的具体命令 |
+| `cc-pilot safe` / `dev` / `yolo` | ✅ | 用指定权限 profile 启动 Claude Code：`safe`（只读）/ `dev`（safe + 构建测试 + 可回滚 git）/ `yolo`（`--dangerously-skip-permissions`，启动前会检查工作树是否干净、是否不在主分支）。Profile 是 [`pilot/profiles/`](./pilot/profiles/) 下的纯文本文件 |
+| `cc-tail` | ✅ | 用 `tail -f` 实时输出 Hook 事件流，并交给 jq 美化格式 |
+| Statusline 模板库 | ✅ | 7 套开箱即用的 `statusLine`，`sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session` 一键切换。详见 [`statuslines/`](./statuslines/) |
 | Hook 事件流 | ✅ | `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` 事件全部写入 `~/.claude/monitor/events.jsonl`（[JSONL](https://jsonlines.org/) = JSON Lines，每行一个 JSON 对象的追加式事件流）|
 
 ---
@@ -171,7 +171,7 @@ cc-bip-posted   # X / LinkedIn 发完帖跑一次 —— 超 24 小时状态栏�
 
 ## 工作机制 & 安全性
 
-本工具集**只读取 Claude Code 自己写到你机器上的本地文件**。零出站网络请求、不调用 Anthropic API、不爬 claude.ai、不碰你的 OAuth token / API key。
+本工具集**只读取 Claude Code 自己写到你机器上的本地文件**。完全不发出站请求、不调用 Anthropic API、不爬 claude.ai、不碰你的 OAuth token 或 API key。
 
 | 行为 | 本工具集 |
 |------|:------:|
@@ -198,8 +198,8 @@ cc-bip-posted   # X / LinkedIn 发完帖跑一次 —— 超 24 小时状态栏�
 ### 真实存在的风险（对你而言）
 
 - **隐私在你自己手上**。`~/.claude/monitor/events.jsonl` 含 prompt 前缀 + 完整 cwd 路径；`~/.claude/projects/*/*.jsonl` 含完整对话内容。**不要 push 到公开仓库**。`.gitignore` 已经处理 `events.jsonl`，如果你把 `~/.claude/` 同步到任何地方，记得把 `projects/` 也排除。
-- **估算不是真值**。`cc-limits` 的 plan 预算、burn rate、reset 倒计时、token 费用估算全部本地推算，每处都标了 `⚠ estimated, not authoritative`。当 guardrail 用，不要当真理 —— Anthropic 的实际限流可能比预测早或晚。
-- **Hooks 是双刃剑**。我们装的 4 个 hooks 都是被动写盘的，但**未来你或队友加恶意 hook**（如自动调外部 API、外发数据）就是另一回事了。审计你当前装了什么：`jq '.hooks' ~/.claude/settings.json`。
+- **估算只是估算**。`cc-limits` 的 plan 预算、burn rate、reset 倒计时、token 费用估算都是本地推算出来的，所以每处都标了 `⚠ estimated, not authoritative`。把它们当参考线用，不要当作权威数字 —— Anthropic 的实际限流可能比预测早或晚发生。
+- **Hooks 是双刃剑**。我们装的 4 个 hooks 都只做"读 stdin、写本地文件"这种被动操作，但**未来你或队友再加进去的 hook**（比如自动调外部 API、外发数据）就是另一回事了。随时可以审计当前装了哪些：`jq '.hooks' ~/.claude/settings.json`。
 
 ### 本工具集**明确不做**的事
 
@@ -221,7 +221,9 @@ Alias 保留（`cc-status` 等仍可只读看现有数据），只是不再追�
 
 ### 我**没有** 100% 把握的事
 
-我没有读过 Anthropic 完整 ToS 的每一行，无法保证某条不用某种异常解读会被适用。上面的判断基于：本工具的所做（零网络、只读本地文件、只用官方 API）跟平台通常会管的行为（凭证盗用、API 滥用、爬取、虚假 usage）是**正交的**。如果你要 100% 保险，最稳的做法是给 Anthropic support 发邮件附上本 README 链接 —— 收到反馈我可以据此更新文档。
+我没有逐字读过 Anthropic 的完整服务条款，所以**无法保证它的某一条不会以某种意外的方式适用到本工具上**。上面的判断基于一个简单观察：本工具实际做的事（零网络、只读本地文件、只用官方 API）跟平台通常会管的违规行为（凭证盗用、API 滥用、爬取、刷假用量）完全不沾边。
+
+如果你想要 100% 保险，**最稳妥的做法是给 Anthropic 客服发一封邮件，附上本 README 链接**。如果你拿到了官方反馈，告诉我，我会据此更新文档。
 
 ---
 
@@ -235,9 +237,9 @@ Alias 保留（`cc-status` 等仍可只读看现有数据），只是不再追�
 
 ## 适合谁用
 
-同时跑多个 Claude Code session 的独立全栈 AI 开发者。无论你叫自己什么 —— **OPC**、**Solo Founder**、**Solo Builder**、**Indie Hacker**、**Vibe Coder** —— 同一类问题，同一套工具。
+同时跑多个 Claude Code session 的独立全栈 AI 开发者。无论你怎么称呼自己 —— **OPC**、**Solo Founder**、**Solo Builder**、**Indie Hacker**、**Vibe Coder** —— 面对的是同一类问题、用得上同一套工具。
 
-一个人 + Claude Code 当工程团队的时候，可观测性比团队场景更重要。这套工具替代那个不存在的队友，给你一份仪表盘。
+一个人把 Claude Code 当工程团队用的时候，可观测性比团队场景更重要 —— 因为没有队友能告诉你"我们昨天到哪了"。这套工具就是来填这个空缺，给你一份你本可以问队友的仪表盘。
 
 ---
 
@@ -245,12 +247,12 @@ Alias 保留（`cc-status` 等仍可只读看现有数据），只是不再追�
 
 欢迎 PR。收录标准只有一句：*"明天我自己也会装到 `~/.claude/` 里吗？"* —— 实用至上，观点鲜明优于面面俱到。Bug 反馈和提问同样欢迎。
 
-**语言策略** —— 默认全部英文：
+**语言策略** —— 默认走英文：
 
-- 所有代码、shell 注释、错误/帮助提示、文档 → English
-- `README.zh-CN.md` 是仓库里**唯一**翻译过的文档；保持与 `README.md` 1:1 对应的结构，方便后续更新对照同步
-- `statuslines/bilingual-cn.sh` 是**唯一**输出中文字符串的脚本（脚本内部注释仍然是英文）
-- 语言切换徽章里的 `alt="中文"` 保留中文 —— 那是读者切换语言时看到的可见文字
+- 所有代码、shell 注释、错误与帮助信息、文档全用英文
+- `README.zh-CN.md` 是仓库里**唯一**的翻译版本；它跟 `README.md` 在结构上一一对应，方便后续更新时对照同步
+- `statuslines/bilingual-cn.sh` 是**唯一**输出中文字符串的脚本（脚本里的注释仍然写英文）
+- 语言切换徽章里的 `alt="中文"` 保留中文 —— 那是读者点击切换语言时看到的标签文字
 
 ---
 

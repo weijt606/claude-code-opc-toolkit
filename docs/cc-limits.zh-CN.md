@@ -108,7 +108,7 @@ cc-limits --calibrate 60         # "我现在 dashboard 上看到 60%"
 # → 之后所有 cc-limits 跑都用这个校准过的 cap，标记 "✓ calibrated"
 ```
 
-加权函数漂移时定期重新校准。任何时候可以撤销：
+如果用一段时间觉得估算又开始偏离实际了，重新校准一次就好。任何时候都可以撤销：
 
 ```bash
 cc-limits --calibrate-clear      # 回到 plan 默认值
@@ -118,17 +118,17 @@ cc-limits --calibrate-clear      # 回到 plan 默认值
 
 `.messages` 和所有 token 总数都按 `.requestId` 去重：
 
-> Claude Code 一个 API 请求会写多条 JSONL 条目（每个 content block 一条：text、tool_use、thinking…），但**所有条目共享同一 `.requestId` 并携带相同的 `.message.usage` 值**。直接累加条目会把 token 算 2-15 倍（取决于 tool call 密度）。`cc-limits` 在聚合前 `unique_by(.requestId)`，匹配 Anthropic 实际计费的 "1 请求 = 1 billable"。
+> Claude Code 一次 API 请求会在 JSONL 里写下多条记录（每种 content block 一条：text、tool_use、thinking…），但**这些记录共享同一个 `.requestId`，而且 `.message.usage` 字段里的数字是完全一样的**。如果直接累加每条记录的 token 数，会把同一笔费用重复算 2 到 15 次（取决于 tool call 多少）。`cc-limits` 在聚合前先 `unique_by(.requestId)`，对应 Anthropic 实际"一次请求 = 一次计费"的口径。
 
 实测 **2026-05-08**：5h 窗口内 135 unique requestIds 对照 `claude.ai/settings/usage` Max 5× plan 的 28% 读数，误差 ±2 个百分点。
 
 ## 注意事项
 
-- **没有暴露的内部计数器**。Claude Code 真实速率限制状态在服务端；`cc-limits` 是聚合代理。
-- **Token 加权计费不透明**。Anthropic 给大上下文 / 重输出请求加更多权重。`--calibrate` 是把本地 % 锚定到 dashboard 的唯一方法。
-- **周限额尚未建模**。Anthropic 还有独立的 7 天滚动上限；`cc-limits` 目前不追踪。真实数据看 `claude.ai/settings/usage`。
-- **价格默认值会过期**。用 `CC_PRICE_*` 环境变量覆盖 —— 别把费用行当真实账单。
-- **macOS / zsh 实测**；Linux 应该能跑（BSD/GNU `stat` 已自动适配），但暂未验证。
+- **真实速率限制状态在服务端，本工具看不到**。`cc-limits` 显示的所有数字都是从你本地 transcript 聚合出来的近似值。
+- **计费按 token 加权，但权重公式不公开**。Anthropic 给上下文大、输出多的请求更高权重，本工具复现不了这部分。`--calibrate` 是把本地估算锚定到 dashboard 真实读数的唯一办法。
+- **周限额尚未建模**。Anthropic 还有一个独立的 7 天滚动上限，目前不追踪。要看真实数据请打开 `claude.ai/settings/usage`。
+- **价格默认值会过期**。用 `CC_PRICE_*` 环境变量覆盖 —— 也别把费用行当成真实账单。
+- **macOS / zsh 实测过**；Linux 应该能跑（BSD 和 GNU 版本的 `stat` 已自动适配），但还没在 Linux 上验证过。
 
 ## Watch 模式
 
