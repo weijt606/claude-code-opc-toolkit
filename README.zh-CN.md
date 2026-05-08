@@ -185,9 +185,15 @@ cc-bip-posted   # X / LinkedIn 发完帖跑一次 —— 超 24 小时状态栏�
 | 读 `~/.claude/projects/*/*.jsonl`（你**自己**的 transcript）| ✅ 你的本地文件 |
 | 调用 `claude --resume <id>`（官方公开 CLI 参数）| ✅ 标准用法 |
 
-**封号或平台警报风险**：我们没识别到任何。零出站请求 = Anthropic 那边没有任何东西可以"检测"。Hooks、`--resume`、`statusLine` 都是官方公开扩展点，按设计使用不构成违反。
+**关于封号或平台告警风险** —— 我们只能描述本工具实际做什么，无法替 Anthropic 解读它自己的服务条款。能验证的事实：
 
-**`cc-limits` 的 "% used" 估算**是从你本地数据反向算出来的：数 transcript 里 unique `requestId` 的数量，除以 Anthropic 公开声明的各档位上限。对照 claude.ai dashboard 验证、调整默认值，本质是**观察 + 算术**，不是利用漏洞。
+- 本工具不向 Anthropic 服务发出任何请求（仅有的一次 `curl` 是用户主动启用的 `cc-daily --export notion`，发往 api.notion.com）。
+- 只读 Claude Code 自己写到你本地磁盘的文件（`~/.claude/projects/`、`~/.claude/sessions/`）。
+- 只使用官方文档中的扩展点：hooks（`SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop`）、`claude --resume`、`claude --allowed-tools` / `--disallowed-tools` / `--dangerously-skip-permissions`、`statusLine` 配置。
+
+你账号是否始终合规取决于**你如何使用这些能力**，跟"是否经过工具包装"没有本质关系。用脚本跑 `git push --force` 跟你自己手敲它的性质是一样的 —— 都受你自己判断的约束。
+
+**关于 `cc-limits` 的 "% used" 估算** —— 所有数字都来自你本地的 transcript JSONL 文件。工具数 unique `requestId` 的数量，除以 plan 配额（Anthropic 公开声明的默认值，可通过 `--calibrate` 用你 dashboard 的真实读数校准）。没有 API 调用、没有爬取、没有触碰 Anthropic 内部数据 —— 只是对 Claude Code 已经写到你机器上的数据做算术。
 
 ### 真实存在的风险（对你而言）
 

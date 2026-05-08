@@ -185,9 +185,15 @@ This toolkit reads only **local files Claude Code writes for you**. It makes zer
 | Reads `~/.claude/projects/*/*.jsonl` (your own transcripts) | ✅ your local files |
 | Invokes `claude --resume <id>` (documented public CLI flag) | ✅ standard usage |
 
-**Risk of account ban or platform alert**: none we can identify. With zero outbound requests, there's nothing for Anthropic to detect. Hooks, `--resume`, and `statusLine` are all official, publicly-documented extension points — using them as designed isn't a violation.
+**On account-ban / platform-alert risk** — we can only describe what this toolkit does, not predict how Anthropic interprets its own ToS. What we can verify:
 
-**The `cc-limits` "% used" estimate** is reverse-engineered from your own local data: count unique `requestId`s in your transcripts, divide by Anthropic's published per-plan caps. Verifying against your own claude.ai dashboard and updating defaults is a normal observation-and-arithmetic exercise, not exploitation.
+- The toolkit makes zero outbound requests to Anthropic services (the lone `curl` is the user-opt-in `cc-daily --export notion` to api.notion.com).
+- It reads only files Claude Code itself writes to your local disk (`~/.claude/projects/`, `~/.claude/sessions/`).
+- It uses only officially-documented extension points: hooks (`SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop`), `claude --resume`, `claude --allowed-tools` / `--disallowed-tools` / `--dangerously-skip-permissions`, and the `statusLine` setting.
+
+Whether your account stays in good standing depends on **how you use these capabilities**, not on the wrapper. Running `git push --force` from a wrapper script isn't materially different from typing it yourself — both are bound by your own judgment.
+
+**On the `cc-limits` "% used" estimate** — every number is computed locally from your own transcript JSONL files. The tool counts unique `requestId` values and divides by the plan cap (Anthropic-published defaults; you can override via `--calibrate` against your real `claude.ai/settings/usage` reading). No API call, no scraping, no Anthropic-internal data — just arithmetic on data Claude Code already saved on your machine.
 
 ### Real risks worth knowing about
 
