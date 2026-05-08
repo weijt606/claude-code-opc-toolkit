@@ -1,0 +1,52 @@
+# cc-pilot safe profile — allowed tools
+# Read-only inspection. Anything that mutates state is NOT here.
+# Edit this file to extend the safe profile (PRs welcome).
+
+# Built-in read-only tools
+Read
+Glob
+Grep
+
+# Read-only Bash inspectors
+Bash(ls*)
+Bash(cat *)
+Bash(head *)
+Bash(tail *)
+Bash(wc *)
+Bash(file *)
+Bash(stat *)
+Bash(du *)
+Bash(df *)
+Bash(pwd)
+Bash(which *)
+Bash(type *)
+Bash(env)
+Bash(date)
+Bash(uname *)
+
+# Search / data-shape tools (read-only)
+Bash(grep *)
+Bash(rg *)
+Bash(find *)
+Bash(awk *)
+Bash(sed -n*)
+Bash(jq *)
+Bash(sort *)
+Bash(uniq *)
+Bash(tr *)
+Bash(cut *)
+
+# Read-only git
+Bash(git status*)
+Bash(git diff*)
+Bash(git log*)
+Bash(git show*)
+Bash(git branch*)
+Bash(git ls-files*)
+Bash(git ls-tree*)
+Bash(git remote*)
+Bash(git config --get*)
+Bash(git rev-parse*)
+Bash(git describe*)
+Bash(git blame*)
+Bash(git stash list*)

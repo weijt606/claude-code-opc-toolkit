@@ -1,25 +1,54 @@
 #!/bin/bash
 # pilot/pilot.sh — manage Claude Code permission rules safely.
 #
-# USAGE
+# SUBCOMMANDS
 #   cc-pilot suggest [flags]   Phase B: learn from your past Bash approvals,
 #                              suggest permissions.allow patterns to merge
-#                              into ~/.claude/settings.json. Refuses to
-#                              suggest patterns matching destructive verbs.
+#                              into ~/.claude/settings.json.
 #
-# Future:
-#   cc-pilot safe              Launch claude with read-only profile
-#   cc-pilot dev               Launch claude with dev-friendly profile
-#   cc-pilot yolo              Launch claude with bypassPermissions (DANGEROUS)
+#   cc-pilot safe [args...]    Launch claude with read-only profile
+#                              (Read/Glob/Grep + safe Bash inspectors).
+#   cc-pilot dev [args...]     Launch with dev profile (safe + Edit/Write
+#                              + builds/tests + reversible git mutations).
+#                              Force-push, rm -rf, sudo etc. are denied.
+#   cc-pilot yolo [args...]    Launch with --dangerously-skip-permissions.
+#                              Refuses to start unless: (a) inside a git repo,
+#                              (b) working tree is clean, (c) current branch
+#                              is NOT main/master/develop/prod/release.
+#                              Override with --i-understand-the-risk.
 #
-# This tool reads your local transcripts and (with your explicit consent)
-# edits ~/.claude/settings.json. It makes zero network calls. It never
-# auto-edits without showing you the diff and asking y/N.
+#   cc-pilot show <profile>    Print what a profile allows / denies.
+#   cc-pilot list-profiles     List available profile files.
+#
+# Profiles live as plain text files in pilot/profiles/. Each line is one
+# permission pattern (Claude Code rule syntax). Lines starting with # are
+# comments. PRs welcome to extend the patterns.
+#
+# This tool reads only local files and uses official Claude Code flags
+# (--allowed-tools, --disallowed-tools, --dangerously-skip-permissions).
+# Zero network calls.
 
 set -e
 
 PROJ_DIR="$HOME/.claude/projects"
 SETTINGS_FILE="$HOME/.claude/settings.json"
+
+# Resolve script's real directory even when invoked through a symlink, so
+# we can find the profiles/ dir regardless of how the user installed.
+_resolve_path() {
+  local p="$1"
+  while [ -L "$p" ]; do
+    local target; target=$(readlink "$p")
+    case "$target" in
+      /*) p="$target" ;;
+      *)  p="$(dirname "$p")/$target" ;;
+    esac
+  done
+  echo "$p"
+}
+SCRIPT_PATH=$(_resolve_path "${BASH_SOURCE[0]}")
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+PROFILES_DIR="$SCRIPT_DIR/profiles"
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "jq not found. brew install jq" >&2
@@ -36,7 +65,181 @@ else
 fi
 
 show_help() {
-  sed -n '2,17p' "$0" | sed 's/^# \?//'
+  sed -n '2,30p' "$0" | sed 's/^# \?//'
+}
+
+# ── Profile-based launcher (Phase C) ────────────────────────────────────────
+#
+# Read a profile file (one rule per line, # = comment), build the args list
+# for `claude --allowed-tools` / `--disallowed-tools`, and exec claude.
+
+read_profile_file() {
+  local f="$1"
+  [ -f "$f" ] || return 0
+  # Print non-empty, non-comment lines.
+  awk 'NF && !/^[[:space:]]*#/' "$f"
+}
+
+print_profile_summary() {
+  local profile="$1" allow_count="$2" deny_count="$3"
+  printf '%s═══════════════════════════════════════════════════════════════════%s\n' "$C_BOLD" "$C_RESET"
+  printf '%s   cc-pilot %s%s — launching Claude Code with this profile\n' "$C_BOLD" "$profile" "$C_RESET"
+  printf '%s═══════════════════════════════════════════════════════════════════%s\n\n' "$C_BOLD" "$C_RESET"
+  printf '  %sAllow:%s   %s patterns auto-pass (no prompt)\n' "$C_GREEN" "$C_RESET" "$allow_count"
+  if [ "$deny_count" -gt 0 ]; then
+    printf '  %sDeny:%s    %s patterns force-prompt regardless of your global allow list\n' "$C_RED" "$C_RESET" "$deny_count"
+  fi
+  printf '  %sShow:%s    cc-pilot show %s\n' "$C_DIM" "$C_RESET" "$profile"
+  printf '\n'
+}
+
+launch_with_profile() {
+  local profile="$1"; shift
+  local allow_file="$PROFILES_DIR/$profile.allow"
+  local deny_file="$PROFILES_DIR/$profile.deny"
+
+  if [ ! -f "$allow_file" ]; then
+    echo "error: profile '$profile' not found at $allow_file" >&2
+    echo "available profiles:" >&2
+    ls "$PROFILES_DIR" 2>/dev/null | sed -E 's/\.(allow|deny)$//' | sort -u | sed 's/^/  /' >&2
+    exit 1
+  fi
+
+  # Build arrays from profile files
+  local allow_args=() deny_args=()
+  while IFS= read -r line; do
+    [ -n "$line" ] && allow_args+=("$line")
+  done < <(read_profile_file "$allow_file")
+  while IFS= read -r line; do
+    [ -n "$line" ] && deny_args+=("$line")
+  done < <(read_profile_file "$deny_file")
+
+  print_profile_summary "$profile" "${#allow_args[@]}" "${#deny_args[@]}"
+
+  # Build the claude command
+  local cmd=(claude)
+  if [ "${#allow_args[@]}" -gt 0 ]; then
+    cmd+=(--allowed-tools "${allow_args[@]}")
+  fi
+  if [ "${#deny_args[@]}" -gt 0 ]; then
+    cmd+=(--disallowed-tools "${deny_args[@]}")
+  fi
+  cmd+=("$@")
+
+  exec "${cmd[@]}"
+}
+
+# Yolo preconditions — refuse to launch unless the user is set up to recover.
+yolo_preflight() {
+  local override="$1"
+
+  if [ "$override" = "1" ]; then
+    printf '%s⚠ %s--i-understand-the-risk%s — skipping safety preconditions.%s\n\n' \
+      "$C_YELLOW" "$C_BOLD" "$C_RESET$C_YELLOW" "$C_RESET"
+    return 0
+  fi
+
+  # Must be in a git repo
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    printf '%s✗ yolo refuses: not inside a git repo.%s\n' "$C_RED" "$C_RESET"
+    printf '  Recovery requires git history. Run %scd %s some_repo%s first, or pass\n' "$C_BOLD" "$C_RESET" ""
+    printf '  %s--i-understand-the-risk%s if you really want to.\n' "$C_BOLD" "$C_RESET"
+    exit 1
+  fi
+
+  # Working tree must be clean
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    printf '%s✗ yolo refuses: working tree has uncommitted changes.%s\n' "$C_RED" "$C_RESET"
+    printf '  Run %sgit commit%s or %sgit stash%s first so you can recover via\n' "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
+    printf '  %sgit reset --hard%s if Claude does something unexpected.\n' "$C_BOLD" "$C_RESET"
+    printf '  Or pass %s--i-understand-the-risk%s.\n' "$C_BOLD" "$C_RESET"
+    exit 1
+  fi
+
+  # Current branch must not be a protected name
+  local branch; branch=$(git branch --show-current 2>/dev/null)
+  case "$branch" in
+    main|master|develop|production|prod|release|stable)
+      printf '%s✗ yolo refuses: you are on protected branch %s%s%s.%s\n' "$C_RED" "$C_BOLD" "$branch" "$C_RESET$C_RED" "$C_RESET"
+      printf '  Switch to a feature/throwaway branch first:\n'
+      printf '    %sgit checkout -b yolo-$(date +%%Y%%m%%d-%%H%%M%%S)%s\n' "$C_BOLD" "$C_RESET"
+      printf '  Or pass %s--i-understand-the-risk%s.\n' "$C_BOLD" "$C_RESET"
+      exit 1
+      ;;
+  esac
+
+  # Show the situation and confirm
+  local head; head=$(git rev-parse --short HEAD 2>/dev/null)
+  printf '%s═══════════════════════════════════════════════════════════════════%s\n' "$C_RED" "$C_RESET"
+  printf '%s   cc-pilot yolo — about to launch Claude with NO permission checks%s\n' "$C_BOLD" "$C_RESET"
+  printf '%s═══════════════════════════════════════════════════════════════════%s\n\n' "$C_RED" "$C_RESET"
+  printf '  Branch:    %s%s%s\n' "$C_BOLD" "$branch" "$C_RESET"
+  printf '  HEAD:      %s\n' "$head"
+  printf '  Worktree:  %sclean ✓%s\n' "$C_GREEN" "$C_RESET"
+  printf '  Recovery:  %sgit reset --hard %s%s\n\n' "$C_BOLD" "$head" "$C_RESET"
+  printf '  Claude can run any shell command without asking. This is intended for\n'
+  printf '  short, sandboxed work in throwaway worktrees / containers.\n\n'
+  printf 'Proceed? [y/N] '
+  read -r ans
+  [[ "$ans" =~ ^[Yy] ]] || { printf '%saborted%s\n' "$C_DIM" "$C_RESET"; exit 1; }
+}
+
+cmd_safe() { launch_with_profile "safe" "$@"; }
+cmd_dev()  { launch_with_profile "dev"  "$@"; }
+
+cmd_yolo() {
+  local override=0
+  local args=()
+  for a in "$@"; do
+    case "$a" in
+      --i-understand-the-risk) override=1 ;;
+      *) args+=("$a") ;;
+    esac
+  done
+  yolo_preflight "$override"
+  printf '\n%sLaunching: claude --dangerously-skip-permissions%s\n\n' "$C_DIM" "$C_RESET"
+  exec claude --dangerously-skip-permissions "${args[@]}"
+}
+
+cmd_show() {
+  local profile="$1"
+  if [ -z "$profile" ]; then
+    echo "usage: cc-pilot show <profile>" >&2
+    cmd_list_profiles
+    exit 1
+  fi
+  local allow_file="$PROFILES_DIR/$profile.allow"
+  local deny_file="$PROFILES_DIR/$profile.deny"
+  if [ ! -f "$allow_file" ] && [ ! -f "$deny_file" ]; then
+    echo "no profile '$profile' found at $PROFILES_DIR" >&2
+    cmd_list_profiles
+    exit 1
+  fi
+  if [ -f "$allow_file" ]; then
+    printf '%s═══ %s.allow %s═══%s\n' "$C_GREEN" "$profile" "(auto-pass)" "$C_RESET"
+    sed 's/^/  /' "$allow_file"
+    printf '\n'
+  fi
+  if [ -f "$deny_file" ]; then
+    printf '%s═══ %s.deny %s═══%s\n' "$C_RED" "$profile" "(force-prompt)" "$C_RESET"
+    sed 's/^/  /' "$deny_file"
+    printf '\n'
+  fi
+}
+
+cmd_list_profiles() {
+  printf '%sAvailable profiles%s (in %s):\n' "$C_BOLD" "$C_RESET" "$PROFILES_DIR"
+  if [ ! -d "$PROFILES_DIR" ]; then
+    echo "  (profiles directory missing — try re-running install.sh)"
+    return 0
+  fi
+  ls "$PROFILES_DIR" | sed -E 's/\.(allow|deny)$//' | sort -u | while read -r p; do
+    [ -z "$p" ] && continue
+    local n_allow n_deny
+    n_allow=$(read_profile_file "$PROFILES_DIR/$p.allow" 2>/dev/null | wc -l | tr -d ' ')
+    n_deny=$(read_profile_file "$PROFILES_DIR/$p.deny" 2>/dev/null | wc -l | tr -d ' ')
+    printf '  %s%-8s%s  %s allow  %s%s deny%s\n' "$C_BOLD" "$p" "$C_RESET" "$n_allow" "$C_DIM" "$n_deny" "$C_RESET"
+  done
 }
 
 # ── Subcommand: suggest ─────────────────────────────────────────────────────
@@ -338,12 +541,11 @@ EOF
 # ── Dispatcher ──────────────────────────────────────────────────────────────
 case "${1:-help}" in
   suggest)            shift; cmd_suggest "$@" ;;
-  safe|dev|yolo)
-    echo "cc-pilot $1: not yet implemented (Phase C). For now, see:" >&2
-    echo "  cc-pilot suggest    # learn from past approvals (safe)" >&2
-    echo "  --dangerously-skip-permissions  # raw bypass (use with caution)" >&2
-    exit 1
-    ;;
+  safe)               shift; cmd_safe "$@" ;;
+  dev)                shift; cmd_dev "$@" ;;
+  yolo)               shift; cmd_yolo "$@" ;;
+  show)               shift; cmd_show "$@" ;;
+  list|list-profiles) cmd_list_profiles ;;
   help|-h|--help)     show_help; exit 0 ;;
   *)
     echo "unknown subcommand: $1" >&2

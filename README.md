@@ -50,6 +50,7 @@ For prompt-count stats and subagent tracking, also merge the `hooks` block from 
 | `cc-daily` | ✅ | Per-project `daily-worklog.md` writer. Optional `--export obsidian` / `--export notion`. |
 | `cc-skill-init <name>` | ✅ | Scaffold `.claude/skills/<name>/` with frontmatter, Step-0 read-context, README, prompts, templates. |
 | `cc-pilot suggest` | ✅ | Read past transcripts, suggest `permissions.allow` patterns from Bash commands you've manually approved ≥ 5×. Refuses destructive patterns; shows the triggering command when blocking. |
+| `cc-pilot safe` / `dev` / `yolo` | ✅ | Launch Claude Code with a permission profile: `safe` (read-only), `dev` (safe + builds/tests + reversible git), `yolo` (`--dangerously-skip-permissions` after preflight: must be in a git repo, working tree clean, branch ≠ `main`/`master`/etc.). Profiles live as plain text in [`pilot/profiles/`](./pilot/profiles/). |
 | `cc-tail` | ✅ | `tail -f` the hook event log with jq pretty-print. |
 | Statusline gallery | ✅ | 7 plug-and-play `statusLine` scripts; swap with `sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session`. See [`statuslines/`](./statuslines/). |
 | Hook event log | ✅ | `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` → `~/.claude/monitor/events.jsonl` (a [JSONL](https://jsonlines.org/) — one JSON object per line — append-only event stream). |
@@ -209,6 +210,28 @@ Add these 39 pattern(s) to ~/.claude/settings.json [permissions.allow]? [y/N]
 ```
 
 When a pattern is blocked, the "triggered by" line tells you why so you can manually refine (e.g. allow `Bash(git add)` exact-match instead of the wildcard `Bash(git add*)` that picked up a force-push).
+
+### Permission profiles: `cc-pilot safe` / `dev` / `yolo`
+
+Launch Claude Code with a session-scoped permission profile — no permanent settings change, no merge into your global config:
+
+```bash
+cc-pilot safe                      # read-only profile
+cc-pilot dev                       # safe + Edit/Write + builds/tests + reversible git
+cc-pilot yolo                      # --dangerously-skip-permissions, with preflight
+cc-pilot show dev                  # see exactly what dev allows / denies
+cc-pilot list-profiles             # available profiles
+```
+
+| Profile | Allows | Denies | Risk |
+|---------|--------|--------|------|
+| `safe` | Read/Glob/Grep + read-only Bash (`ls`, `cat`, `grep`, `find`, `awk`, read-only `git`, etc.) | (nothing — pure additive over default) | 🟢 nearly zero |
+| `dev` | Everything in safe + `Edit`/`Write` + build & test runners (`npm`, `pnpm`, `yarn`, `cargo`, `go test`, `pytest`, `make`, `mvn`, `dotnet`, …) + reversible git (`add`, `commit`, `stash`, `pull`, `fetch`, plain `push`) | Force-push, hard-reset, `rm -rf`, `sudo`, curl-piped-to-shell, `chmod -R` | 🟡 medium — but git rollback covers most damage |
+| `yolo` | Everything (bypassPermissions = true) | (nothing — that's the point) | 🔴 high — only inside a worktree / container |
+
+**`yolo` won't start unless** you're inside a git repo, your working tree is clean, AND your current branch is **not** `main` / `master` / `develop` / `prod` / `production` / `release` / `stable`. If any precondition fails, the tool exits with the exact reason. Override with `--i-understand-the-risk`.
+
+Profiles are plain-text files (`pilot/profiles/<name>.allow`, `<name>.deny`) — one [Claude Code permission rule](https://docs.claude.com/en/docs/claude-code/iam) per line, `#` for comments. **PRs welcome to extend `dev.allow` with build verbs for languages we don't yet cover.**
 
 ### Statusline gallery
 

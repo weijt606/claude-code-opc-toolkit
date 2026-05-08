@@ -1,0 +1,68 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  shell-syntax:
+    name: bash -n + shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bash -n on every .sh
+        run: |
+          set -e
+          fail=0
+          while IFS= read -r f; do
+            if ! bash -n "$f"; then
+              echo "::error file=$f::syntax error"
+              fail=1
+            fi
+          done < <(find . -type f -name '*.sh' -not -path './.git/*')
+          [ "$fail" -eq 0 ]
+
+      - name: shellcheck (warnings + errors)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y shellcheck
+          # SC1090/SC1091: source warnings (we source dynamic paths intentionally)
+          # SC2155: declare and assign separately (we accept inline for terseness)
+          # SC2086: word splitting on unquoted vars (manageable in this codebase)
+          shellcheck \
+            --severity=warning \
+            --exclude=SC1090,SC1091,SC2155,SC2086 \
+            $(find . -type f -name '*.sh' -not -path './.git/*')
+
+  jq-syntax:
+    name: jq programs parse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install jq
+        run: sudo apt-get install -y jq
+      - name: validate settings.example.json
+        run: jq -e '.hooks.SessionStart[0].hooks[0].command' settings.example.json
+      - name: validate banner.svg is XML
+        run: |
+          sudo apt-get install -y libxml2-utils
+          xmllint --noout banner.svg
+
+  links:
+    name: README cross-refs resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: check ./* links exist
+        run: |
+          set -e
+          for f in $(grep -hoE '\(\./[^)]+\)' README.md README.zh-CN.md statuslines/README.md | sed 's/[()]//g' | sort -u); do
+            rel=${f#./}
+            if [ ! -e "$rel" ]; then
+              echo "::error::missing referenced path: $f"
+              exit 1
+            fi
+          done

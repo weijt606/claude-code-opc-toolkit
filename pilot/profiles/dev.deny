@@ -1,0 +1,36 @@
+# cc-pilot dev profile — explicitly denied tools
+# Things to NEVER auto-allow even in dev mode. These get explicitly --disallowed
+# so they always prompt regardless of any user-level allow rules.
+
+# Destructive filesystem
+Bash(rm -rf*)
+Bash(rm -fr*)
+Bash(rm -r*)
+
+# Destructive git (loses work or rewrites public history)
+Bash(git push --force*)
+Bash(git push -f*)
+Bash(git push --force-with-lease*)
+Bash(git reset --hard*)
+Bash(git clean -fd*)
+Bash(git clean -fdx*)
+Bash(git clean -f*)
+Bash(git branch -D*)
+Bash(git checkout .)
+Bash(git restore .)
+
+# Privileged
+Bash(sudo *)
+Bash(su -*)
+Bash(chmod -R*)
+Bash(chown *)
+
+# Network exec patterns (curl-piped-to-shell etc.)
+Bash(curl *|*sh*)
+Bash(curl *|*bash*)
+Bash(wget *|*sh*)
+Bash(wget *|*bash*)
+
+# Disk
+Bash(dd *)
+Bash(mkfs*)

@@ -50,6 +50,7 @@ cc-limits        # 跨所有 transcript 的 token 用量与估算费用
 | `cc-daily` | ✅ | 给每个项目自动写 `daily-worklog.md`；可选 `--export obsidian` / `--export notion` 同步到外部 |
 | `cc-skill-init <name>` | ✅ | 一行命令在 `.claude/skills/<name>/` 生成完整 Skill 脚手架（含 frontmatter、Step-0 读上下文区块）|
 | `cc-pilot suggest` | ✅ | 扫描历史 transcript，从你手动批准过 ≥ 5 次的 Bash 命令推导 `permissions.allow` 规则。拒绝破坏性模式；被拦截时附触发的具体命令 |
+| `cc-pilot safe` / `dev` / `yolo` | ✅ | 用指定权限 profile 启动 Claude Code：`safe`（只读）/ `dev`（safe + 构建/测试 + 可回滚 git）/ `yolo`（`--dangerously-skip-permissions`，启动前强制 git 干净 + 非主分支）。Profile 是 [`pilot/profiles/`](./pilot/profiles/) 下的纯文本文件 |
 | `cc-tail` | ✅ | 实时 `tail -f` Hook 事件流，jq 自动高亮 |
 | Statusline 模板库 | ✅ | 7 套即插即用的 `statusLine`，`sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session` 一键切换。详见 [`statuslines/`](./statuslines/) |
 | Hook 事件流 | ✅ | `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` 事件全部写入 `~/.claude/monitor/events.jsonl`（[JSONL](https://jsonlines.org/) = JSON Lines，每行一个 JSON 对象的追加式事件流）|
@@ -209,6 +210,28 @@ Add these 39 pattern(s) to ~/.claude/settings.json [permissions.allow]? [y/N]
 ```
 
 **模式被拦截时**，"triggered by" 那行告诉你**为什么** —— 你可以手动精细化处理（比如改成精确匹配 `Bash(git add)` 而不是通配 `Bash(git add*)`，避免一条 force-push 污染整个模式）。
+
+### 权限 profile：`cc-pilot safe` / `dev` / `yolo`
+
+用 session 级的权限 profile 启动 Claude Code —— 不会永久改你的 settings，也不会污染全局配置：
+
+```bash
+cc-pilot safe                      # 只读 profile
+cc-pilot dev                       # safe + Edit/Write + 构建/测试 + 可回滚 git
+cc-pilot yolo                      # --dangerously-skip-permissions，启动前预检
+cc-pilot show dev                  # 查看 dev 具体允许 / 禁止什么
+cc-pilot list-profiles             # 列出可用 profiles
+```
+
+| Profile | 允许 | 禁止 | 风险 |
+|---------|------|------|------|
+| `safe` | Read/Glob/Grep + 只读 Bash（`ls`、`cat`、`grep`、`find`、`awk`、只读 `git` 等）| （无 —— 纯加白）| 🟢 几乎为零 |
+| `dev` | safe 全部 + `Edit`/`Write` + 构建测试工具（`npm`、`pnpm`、`yarn`、`cargo`、`go test`、`pytest`、`make`、`mvn`、`dotnet` 等）+ 可回滚 git（`add`、`commit`、`stash`、`pull`、`fetch`、普通 `push`）| force-push、hard reset、`rm -rf`、`sudo`、curl-piped-to-shell、`chmod -R` | 🟡 中 —— git 回滚能覆盖大部分损害 |
+| `yolo` | 一切（bypassPermissions = true）| （无 —— 这就是 yolo 的意义）| 🔴 高 —— **仅在 worktree / 容器中用** |
+
+**`yolo` 不会启动**，除非：(a) 你在 git 仓库里，(b) 工作树干净（无未提交修改），(c) 当前分支**不是** `main` / `master` / `develop` / `prod` / `production` / `release` / `stable`。任一条件不满足，工具立即退出并打印具体原因。强行越过用 `--i-understand-the-risk`。
+
+Profile 是纯文本文件（`pilot/profiles/<name>.allow`、`<name>.deny`），每行一条 [Claude Code 权限规则](https://docs.claude.com/en/docs/claude-code/iam)，`#` 开头是注释。**欢迎 PR 给 `dev.allow` 补充我们尚未覆盖的语言/工具的构建命令。**
 
 ### 状态栏模板库
 
