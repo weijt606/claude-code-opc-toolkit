@@ -70,18 +70,30 @@ cc-resume                     # fzf 选择 → 回任意历史 session
 
 ### Token 用量与费用：`cc-limits`
 
+**首次配置** —— 设一次档位，然后用 `claude.ai/settings/usage` 上的真实读数把预算 % 锚定下来。配完之后 `cc-limits` 跟 dashboard 误差在 ±5pp 以内：
+
 ```bash
-cc-limits                          # 默认：最近 24 小时
-cc-limits -1h                      # 自定义窗口：-30m | -1h | -7d | -30d | --last 6h
-cc-limits --plan max5 --watch      # 加 5h plan 预算 + 自动刷新
-cc-limits --calibrate 60           # 把预算 % 锚定到 dashboard 真实读数
+# 1. 设置你的档位（写进 ~/.zshrc 让它常驻）
+export CC_PLAN=max5                  # 可选值：pro | max5 | max20 | team | free
+
+# 2. 打开 claude.ai/settings/usage，记下 "Current session" 的 %
+# 3. 立即用那个 % 校准 cc-limits（动作越快越准）：
+cc-limits --calibrate 40             # 把 40 换成 dashboard 显示的数字
 ```
 
-每个窗口都展示：活跃进程 · 该窗口聚合数据（token / 费用 / 按模型分类）· plan 预算（设了 `CC_PLAN` 才有，永远锚定 5h 滚动窗口）· top sessions。
+校准后的 cap 会保存在 `~/.claude/monitor/cc-plan.conf`。等你发现又开始偏离了，重新跑一次 `--calibrate <pct>` 即可；想撤销用 `--calibrate-clear`。
 
-Plan 预算支持档位：`pro | max5 | max20 | team | free | api`。默认值是尽力估算；`--calibrate <pct>` 把本地 % 锚定到 `claude.ai/settings/usage` 真实读数（Anthropic 计费按 token 加权且不透明）。
+**日常使用：**
 
-**完整参考**：[`docs/cc-limits.zh-CN.md`](./docs/cc-limits.zh-CN.md) —— Sonnet/Haiku 价格覆盖、session-anchor 调参、`% used` 为何漂移、周限额说明、watch 模式环境变量。
+```bash
+cc-limits                            # 默认窗口：最近 24 小时
+cc-limits -1h                        # 窗口简写：-30m | -1h | -7d | -30d | --last 6h
+cc-limits --watch                    # 自动刷新（30 秒）
+```
+
+每个窗口都展示：活跃进程 · 该窗口聚合数据（token / 费用 / 按模型分类）· plan 预算（设了 `CC_PLAN` 时显示，永远锚定到当前 5h tumbling 块）· top sessions。
+
+**完整参考**：[`docs/cc-limits.zh-CN.md`](./docs/cc-limits.zh-CN.md) —— Sonnet/Haiku 价格覆盖、tumbling 窗口工作原理、`% used` 为何漂移、周限额说明、watch 模式环境变量。
 
 ### 每日工作日志：`cc-daily`
 

@@ -6,7 +6,24 @@
 
 ---
 
-## 命令速查
+## 推荐配置流程（首次设置一次即可）
+
+Plan 预算块**校准过**才好用。Anthropic 计费按 token 加权且不透明，所以静态默认值会漂移；校准把本地 `% used` 锚定到你 dashboard 上的真实读数。
+
+```bash
+# 1. 设置一次档位（写进 ~/.zshrc 让它常驻）
+export CC_PLAN=max5                  # 可选值：pro | max5 | max20 | team | free | api
+
+# 2. 打开 claude.ai/settings/usage，记下 "Current session" 的 %
+# 3. 立即校准（动作越快越准 —— 等的时间越长，快照越旧）：
+cc-limits --calibrate 40             # 把 40 换成 dashboard 显示的数字
+```
+
+工具会把校准后的 cap 写到 `~/.claude/monitor/cc-plan.conf`。之后 `cc-limits` 显示的预算 % 跟 dashboard 误差在 ±5pp 以内。等你发现又开始偏离，重新跑一次 `--calibrate <pct>`；想撤销用 `--calibrate-clear`。
+
+> 如果你不做校准，工具会用 Anthropic 公开声明的各档配额作为兜底。那些默认值能给你大致方向，但**一定会漂移** —— Anthropic 的计费按请求大小和复杂度加权，本地复现不了那个公式。
+
+## 日常命令速查
 
 ```bash
 cc-limits                          # 默认：最近 24 小时
@@ -17,8 +34,6 @@ cc-limits -30d                     # 最近 30 天
 cc-limits --last 6h                # 长写法（= -6h）
 cc-limits --days 30                # 兼容旧用法（= -30d）
 cc-limits -7d --watch              # 自动刷新
-cc-limits --plan max5              # 加上 plan 预算块
-cc-limits --calibrate 60           # 校准预算 % 到 dashboard
 cc-limits --calibrate-clear        # 撤销校准，回到 plan 默认值
 ```
 

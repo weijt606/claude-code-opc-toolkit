@@ -7,6 +7,11 @@ and this project adheres to [CalVer](https://calver.org/) (`vYYYY.MM.DD`) for re
 
 ## [Unreleased]
 
+### Changed — `cc-limits` accuracy
+
+- **Tumbling 5-hour windows** replace gap-detected rolling windows. Anthropic's metering uses tumbling blocks anchored at first-request-of-day (window N = `[anchor + 5N·h, anchor + 5(N+1)·h]`), not a rolling 5h that resets after a 30-minute lunch. New `anchor_ts()` looks back 24h for the first request after a ≥5h gap; `plan_block()` then computes the current tumbling block and counts only messages within it. Reset countdown now matches `claude.ai/settings/usage` within ~2 minutes (down from ~1h 35m off). Tunables: `CC_SESSION_GAP_MIN=300`, `CC_ANCHOR_LOOKBACK_HOURS=24`.
+- **Calibration is now the recommended setup, not a fallback.** README and `docs/cc-limits.md` (EN + ZH) now lead with the `export CC_PLAN=max5` + `cc-limits --calibrate <pct>` flow. Static plan caps are token-weighted by Anthropic and drift; `--calibrate` is the only way to pin local % to dashboard reality.
+
 ## [v2026.05.08] — 2026-05-08
 
 ### Added — `cc-pilot` (Phase B + C)

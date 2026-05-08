@@ -6,7 +6,24 @@ Cross-project Claude Code usage monitor. Aggregates from your local transcript f
 
 ---
 
-## Quick reference
+## Recommended setup (do this once)
+
+The plan budget block is most useful when calibrated to your real `claude.ai/settings/usage` reading. Anthropic's metering is token-weighted and opaque, so static defaults drift; calibration anchors the local `% used` to the dashboard.
+
+```bash
+# 1. Set your plan once (add to ~/.zshrc to make it persistent)
+export CC_PLAN=max5                  # one of: pro | max5 | max20 | team | free | api
+
+# 2. Open claude.ai/settings/usage, note the "Current session" %
+# 3. Calibrate IMMEDIATELY (the longer you wait the staler the snapshot):
+cc-limits --calibrate 40             # whatever % the dashboard showed
+```
+
+This writes the calibrated cap to `~/.claude/monitor/cc-plan.conf`. From then on, `cc-limits` shows budget % within ±5 pp of the dashboard. Re-calibrate when you notice drift; clear with `--calibrate-clear`.
+
+> If you skip calibration, the tool falls back to Anthropic's published per-plan caps. Those defaults are a rough guide but **will drift** because Anthropic's metering accounts for request size and complexity in ways we can't replicate locally.
+
+## Daily reference
 
 ```bash
 cc-limits                          # default: last 24 hours
@@ -17,9 +34,7 @@ cc-limits -30d                     # last 30 days
 cc-limits --last 6h                # long form (same as -6h)
 cc-limits --days 30                # legacy spelling for -30d
 cc-limits -7d --watch              # auto-refresh
-cc-limits --plan max5              # add the plan-aware budget block
-cc-limits --calibrate 60           # anchor budget % to dashboard
-cc-limits --calibrate-clear        # back to plan defaults
+cc-limits --calibrate-clear        # revert to plan defaults
 ```
 
 Window units supported: **`m`** (minutes) · **`h`** (hours) · **`d`** (days) · **`w`** (weeks). Default window if no flag is given: **last 24 hours**.

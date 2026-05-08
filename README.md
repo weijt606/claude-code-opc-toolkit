@@ -70,18 +70,30 @@ cc-resume                     # fzf picker — pick any past session, Enter to r
 
 ### Token usage & cost: `cc-limits`
 
+**One-time setup** — set your plan once, then anchor the budget % to your real `claude.ai/settings/usage` reading. After this, `cc-limits` matches the dashboard within ±5 pp:
+
 ```bash
-cc-limits                          # default: last 24 hours
-cc-limits -1h                      # custom window: -30m | -1h | -7d | -30d | --last 6h
-cc-limits --plan max5 --watch      # add 5h plan budget + auto-refresh
-cc-limits --calibrate 60           # anchor budget % to your dashboard reading
+# 1. Set your plan (add this line to ~/.zshrc so it sticks)
+export CC_PLAN=max5                  # one of: pro | max5 | max20 | team | free
+
+# 2. Open claude.ai/settings/usage in your browser, note the "Current session" %
+# 3. Calibrate cc-limits against that reading — do this immediately after step 2:
+cc-limits --calibrate 40             # whatever % the dashboard showed
 ```
 
-Every window shows: live processes · window aggregates (tokens / cost / per-model) · plan budget if `CC_PLAN` is set (always 5h-anchored) · top sessions by output.
+The calibrated cap is saved to `~/.claude/monitor/cc-plan.conf`. Re-run `--calibrate <pct>` when you notice drift; clear with `--calibrate-clear`.
 
-Plan-aware budget supports `pro | max5 | max20 | team | free | api`. Defaults are best-effort; `--calibrate <pct>` anchors local % to whatever `claude.ai/settings/usage` actually shows you (Anthropic's metering is token-weighted and opaque).
+**Daily use:**
 
-**Full reference**: [`docs/cc-limits.md`](./docs/cc-limits.md) — pricing overrides for Sonnet/Haiku, session-anchor tuning, why `% used` drifts, weekly-cap caveats, watch-mode env vars.
+```bash
+cc-limits                            # default window: last 24 hours
+cc-limits -1h                        # window shorthand: -30m | -1h | -7d | -30d | --last 6h
+cc-limits --watch                    # auto-refresh (30 s)
+```
+
+Every window shows: live processes · window aggregates (tokens / cost / per-model) · plan budget (always anchored to the current 5 h tumbling block when `CC_PLAN` is set) · top sessions by output.
+
+**Full reference**: [`docs/cc-limits.md`](./docs/cc-limits.md) — pricing overrides for Sonnet/Haiku, tumbling-window mechanics, why `% used` drifts, weekly-cap caveats, watch-mode env vars.
 
 ### Daily worklog: `cc-daily`
 
