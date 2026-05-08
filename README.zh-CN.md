@@ -49,6 +49,7 @@ cc-limits        # 跨所有 transcript 的 token 用量与估算费用
 | `cc-limits` | ✅ | Token 用量与估算费用：当前活跃进程的上下文大小、5h / 24h / N 日窗口、消耗 top session |
 | `cc-daily` | ✅ | 给每个项目自动写 `daily-worklog.md`；可选 `--export obsidian` / `--export notion` 同步到外部 |
 | `cc-skill-init <name>` | ✅ | 一行命令在 `.claude/skills/<name>/` 生成完整 Skill 脚手架（含 frontmatter、Step-0 读上下文区块）|
+| `cc-pilot suggest` | ✅ | 扫描历史 transcript，从你手动批准过 ≥ 5 次的 Bash 命令推导 `permissions.allow` 规则。拒绝破坏性模式；被拦截时附触发的具体命令 |
 | `cc-tail` | ✅ | 实时 `tail -f` Hook 事件流，jq 自动高亮 |
 | Statusline 模板库 | ✅ | 7 套即插即用的 `statusLine`，`sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session` 一键切换。详见 [`statuslines/`](./statuslines/) |
 | Hook 事件流 | ✅ | `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` 事件全部写入 `~/.claude/monitor/events.jsonl`（[JSONL](https://jsonlines.org/) = JSON Lines，每行一个 JSON 对象的追加式事件流）|

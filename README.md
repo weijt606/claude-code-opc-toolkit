@@ -49,6 +49,7 @@ For prompt-count stats and subagent tracking, also merge the `hooks` block from 
 | `cc-limits` | ✅ | Token usage + estimated cost. Live processes, 5h / 24h / N-day windows, top sessions. |
 | `cc-daily` | ✅ | Per-project `daily-worklog.md` writer. Optional `--export obsidian` / `--export notion`. |
 | `cc-skill-init <name>` | ✅ | Scaffold `.claude/skills/<name>/` with frontmatter, Step-0 read-context, README, prompts, templates. |
+| `cc-pilot suggest` | ✅ | Read past transcripts, suggest `permissions.allow` patterns from Bash commands you've manually approved ≥ 5×. Refuses destructive patterns; shows the triggering command when blocking. |
 | `cc-tail` | ✅ | `tail -f` the hook event log with jq pretty-print. |
 | Statusline gallery | ✅ | 7 plug-and-play `statusLine` scripts; swap with `sl-default` / `sl-cost` / `sl-pomo` / `sl-bip` / `sl-cn` / `sl-minimal` / `sl-session`. See [`statuslines/`](./statuslines/). |
 | Hook event log | ✅ | `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop` → `~/.claude/monitor/events.jsonl` (a [JSONL](https://jsonlines.org/) — one JSON object per line — append-only event stream). |
