@@ -169,6 +169,46 @@ cc-skill-init my-utility --global         # ~/.claude/skills/ instead of ./.clau
 
 Generates a complete skill structure (`SKILL.md` with frontmatter and `Step 0 · Context check`, `README.md`, `prompts/starter.md`, empty `templates/` and `examples/`).
 
+### Reduce permission prompts: `cc-pilot suggest`
+
+Tired of clicking "yes" on the same `git status`, `npm test`, `ls -la` 50× a day? Have `cc-pilot` learn from your history and suggest a refined `permissions.allow` block:
+
+```bash
+cc-pilot suggest                    # last 7d, ≥5 invocations, default
+cc-pilot suggest --days 14          # widen the window
+cc-pilot suggest --min-count 3      # lower the bar
+cc-pilot suggest -y                 # skip the merge confirmation
+```
+
+What it does:
+1. Walks your transcripts in the time window, extracts every Bash command Claude actually ran
+2. Derives a permission pattern (e.g. `git status -s` → `Bash(git status*)`)
+3. Filters out anything that ever appeared in a destructive context (substring-matched against a built-in deny list: `rm -rf`, `git push --force`, `git reset --hard`, `sudo`, `curl `, `wget `, `dd if=`, `mkfs`, `chmod -R`, redirects to `/etc/`/`/usr/`/`/System/`, etc.)
+4. Skips read-only inspectors (`grep`, `find`, `cat`, `ls`, `awk`, …) so commands like `grep -n "rm -rf" *.sh` aren't false-positive flagged
+5. Drops patterns already in your `permissions.allow`
+6. Shows three sections: ✅ Recommended · ℹ️ Already allowed · 🚫 Blocked (with the exact triggering command displayed)
+7. Asks `[y/N]` before merging — backs up `~/.claude/settings.json` first
+
+Sample output:
+
+```
+✅ Recommended (safe, ≥5 invocations, not yet allowed)
+    133×  Bash(grep -n*)
+    102×  Bash(pnpm --filter*)
+     57×  Bash(git status*)
+     ...
+
+🚫 Blocked from auto-suggesting (at least one invocation matched the destructive deny list)
+    112×  Bash(git add*)
+         triggered by: git add . && git push --force origin main
+     25×  Bash(curl -s*)
+         triggered by: curl -s https://api.github.com/repos/...
+
+Add these 39 pattern(s) to ~/.claude/settings.json [permissions.allow]? [y/N]
+```
+
+When a pattern is blocked, the "triggered by" line tells you why so you can manually refine (e.g. allow `Bash(git add)` exact-match instead of the wildcard `Bash(git add*)` that picked up a force-push).
+
 ### Statusline gallery
 
 7 plug-and-play `statusLine` scripts. Each is a single shell file that reads Claude Code's stdin JSON (`.workspace.current_dir`, `.model.display_name`, `.context_window.used_percentage`) and prints one short line. `sl-*` aliases swap the active statusline with one keystroke — restart the Claude Code session for it to take effect.

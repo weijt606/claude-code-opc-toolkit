@@ -11,6 +11,8 @@ MONITOR_SRC="$REPO_DIR/monitor"
 MONITOR_DST="$HOME/.claude/monitor"
 SKILLS_SRC="$REPO_DIR/skills"
 SKILLS_DST="$HOME/.claude/skills-bin"   # 'skills-bin' not 'skills' — Claude Code reads ~/.claude/skills/ for actual skills
+PILOT_SRC="$REPO_DIR/pilot"
+PILOT_DST="$HOME/.claude/pilot"
 
 GREEN=$'\033[32m'; YELLOW=$'\033[33m'; DIM=$'\033[2m'; BOLD=$'\033[1m'; RESET=$'\033[0m'
 
@@ -45,6 +47,16 @@ if [ -d "$SKILLS_SRC" ]; then
   done
 fi
 
+if [ -d "$PILOT_SRC" ]; then
+  mkdir -p "$PILOT_DST"
+  for f in "$PILOT_SRC"/*.sh; do
+    [ -f "$f" ] || continue
+    base=$(basename "$f")
+    ln -sf "$f" "$PILOT_DST/$base"
+    say "$GREEN" "✓ symlinked $PILOT_DST/$base -> $f"
+  done
+fi
+
 # Statusline gallery — symlinked into ~/.claude/statuslines/, picked via `sl-<name>` aliases
 SL_SRC="$REPO_DIR/statuslines"
 SL_DST="$HOME/.claude/statuslines"
@@ -76,6 +88,7 @@ alias cc-limits='$HOME/.claude/monitor/limits.sh'
 alias cc-daily='$HOME/.claude/monitor/daily.sh'
 alias cc-tail='tail -f $HOME/.claude/monitor/events.jsonl | jq'
 alias cc-skill-init='$HOME/.claude/skills-bin/skill-init.sh'
+alias cc-pilot='$HOME/.claude/pilot/pilot.sh'
 
 # statusline switchers (run, then restart Claude Code or open a new session)
 alias sl-default='ln -sf $HOME/.claude/statuslines/default-opc.sh $HOME/.claude/statusline-command.sh && echo "→ default-opc"'

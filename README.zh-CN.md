@@ -169,6 +169,46 @@ cc-skill-init my-utility --global         # 放到 ~/.claude/skills/，所有项
 
 生成完整的 Skill 结构：带 frontmatter 与 `Step 0 · Context check` 的 `SKILL.md`、面向人的 `README.md`、起手 prompt、空的 `templates/` 与 `examples/` 目录。
 
+### 减少权限提示：`cc-pilot suggest`
+
+每天点 50 次 "yes" 批准 `git status`、`npm test`、`ls -la` 是不是已经麻木了？让 `cc-pilot` 从你的历史里学习，推荐一个精炼的 `permissions.allow` 块：
+
+```bash
+cc-pilot suggest                    # 默认 7 天窗口，≥5 次出现的模式
+cc-pilot suggest --days 14          # 拓宽窗口
+cc-pilot suggest --min-count 3      # 降低阈值
+cc-pilot suggest -y                 # 跳过合并确认
+```
+
+它做什么：
+1. 扫描时间窗口内所有 transcript，提取 Claude 实际跑过的每条 Bash 命令
+2. 推导出权限模式（例：`git status -s` → `Bash(git status*)`）
+3. 过滤掉**任何曾经在破坏性上下文中出现过**的模式（内置 deny list 子串匹配：`rm -rf`、`git push --force`、`git reset --hard`、`sudo`、`curl `、`wget `、`dd if=`、`mkfs`、`chmod -R`、重定向到 `/etc/`/`/usr/`/`/System/` 等）
+4. 跳过只读类命令（`grep`、`find`、`cat`、`ls`、`awk`…），避免 `grep -n "rm -rf" *.sh` 这种**只是在搜代码内容**的命令被误判
+5. 跳过已经在 `permissions.allow` 里的模式
+6. 三段输出：✅ 推荐 · ℹ️ 已存在 · 🚫 被拦截（**附触发拦截的具体命令**）
+7. 合并前**问 `[y/N]`**，先备份 `~/.claude/settings.json`
+
+输出示例：
+
+```
+✅ Recommended (safe, ≥5 invocations, not yet allowed)
+    133×  Bash(grep -n*)
+    102×  Bash(pnpm --filter*)
+     57×  Bash(git status*)
+     ...
+
+🚫 Blocked from auto-suggesting (at least one invocation matched the destructive deny list)
+    112×  Bash(git add*)
+         triggered by: git add . && git push --force origin main
+     25×  Bash(curl -s*)
+         triggered by: curl -s https://api.github.com/repos/...
+
+Add these 39 pattern(s) to ~/.claude/settings.json [permissions.allow]? [y/N]
+```
+
+**模式被拦截时**，"triggered by" 那行告诉你**为什么** —— 你可以手动精细化处理（比如改成精确匹配 `Bash(git add)` 而不是通配 `Bash(git add*)`，避免一条 force-push 污染整个模式）。
+
 ### 状态栏模板库
 
 7 套即插即用的 `statusLine` 脚本。每套都是单文件 shell：读 Claude Code 通过 stdin 传入的 JSON（`.workspace.current_dir`、`.model.display_name`、`.context_window.used_percentage`），输出一行简洁字符串。`sl-*` 别名一键切换，**切换后需重启 Claude Code session 才会生效**。
