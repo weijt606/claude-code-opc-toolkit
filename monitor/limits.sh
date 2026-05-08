@@ -257,20 +257,30 @@ sum_all() {
       ' 2>/dev/null
 }
 
-# Session-start timestamp: find the start of the current "session" inside
-# the 5h window. Anthropic doesn't use a pure rolling 5h — they anchor at
-# the first request of an active block (after a quiet period). We
-# approximate that by walking the request timestamps forward and
-# splitting at gaps >= CC_SESSION_GAP_MIN minutes (default 30).
+# Find the original session anchor. Anthropic uses TUMBLING 5-hour windows:
+# session 1 starts at your first request of the day, session 2 at +5h,
+# session 3 at +10h, etc. Gaps shorter than ~5h (typical "I went to lunch"
+# pauses) do NOT reset the anchor — only a fully-elapsed window does.
 #
-# Returns ISO8601 or "". Override threshold:
-#   export CC_SESSION_GAP_MIN=60   # treat 1h+ gaps as session boundaries
-session_start_ts() {
-  local since="$1"
-  local gap_min="${CC_SESSION_GAP_MIN:-30}"
+# Empirically verified 2026-05-09: my user had a 175-min gap that did
+# NOT reset their session per Anthropic's dashboard, but a 5h+ gap did.
+#
+# Algorithm:
+#   1. Look back CC_ANCHOR_LOOKBACK_HOURS hours (default 24h) of transcripts.
+#   2. Walk timestamps forward; the most recent gap >= CC_SESSION_GAP_MIN
+#      minutes (default 300 = 5h) marks the latest session-anchor reset.
+#   3. Anchor = first request after that gap, or earliest if no gap.
+#
+# Returns the original anchor timestamp; the caller computes the
+# *current* tumbling window via anchor + N*5h.
+anchor_ts() {
+  local lookback_hours="${CC_ANCHOR_LOOKBACK_HOURS:-24}"
+  local since
+  since=$(date -u -v-"${lookback_hours}"H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null \
+          || date -u -d "${lookback_hours} hours ago" +"%Y-%m-%dT%H:%M:%SZ")
+  local gap_min="${CC_SESSION_GAP_MIN:-300}"
   local gap_sec=$((gap_min * 60))
 
-  # Get unique requestId timestamps in window, sorted ascending (one per requestId).
   local ts_list
   ts_list=$(find "$PROJ_DIR" -maxdepth 2 -name '*.jsonl' -type f 2>/dev/null \
     | xargs -L 50 -P 1 cat 2>/dev/null \
@@ -286,8 +296,6 @@ session_start_ts() {
 
   [ -z "$ts_list" ] && return
 
-  # Walk forward; the most recent gap >= gap_sec marks the session-start
-  # anchor. Default to earliest ts if no gap found.
   local prev=0 ss=""
   while IFS= read -r ts; do
     [ -z "$ts" ] && continue
@@ -305,6 +313,9 @@ session_start_ts() {
 
   printf '%s' "$ss"
 }
+
+# Backward-compat alias — older code paths may still call this name.
+session_start_ts() { anchor_ts; }
 
 # ISO8601 (with optional fractional seconds + Z) → epoch seconds, portable
 iso_to_epoch() {
@@ -367,27 +378,43 @@ plan_block() {
     return
   fi
 
-  # Find session-start anchor (first request after >= CC_SESSION_GAP_MIN gap)
-  local ss; ss=$(session_start_ts "$since_5h")
-  if [ -z "$ss" ]; then
+  # Find original anchor (first request of the day, or first after a 5h+ gap).
+  local anchor; anchor=$(anchor_ts)
+  if [ -z "$anchor" ]; then
     printf '    %s(no recent activity — full budget available)%s\n' "$C_DIM" "$C_RESET"
     return
   fi
 
-  local ss_epoch; ss_epoch=$(iso_to_epoch "$ss")
-  [ -z "$ss_epoch" ] && return
+  local anchor_epoch; anchor_epoch=$(iso_to_epoch "$anchor")
+  [ -z "$anchor_epoch" ] && return
 
-  # Count unique requests since session-start (not since 5h window edge)
+  # Compute the CURRENT tumbling 5h window:
+  #   window_n        = how many full 5h blocks have elapsed since anchor
+  #   window_start    = anchor + window_n * 5h
+  #   reset_epoch     = anchor + (window_n + 1) * 5h
+  # We count messages from window_start (NOT from anchor) since Anthropic
+  # only counts the current block's activity.
+  local elapsed=$((now_epoch - anchor_epoch))
+  local window_n=$((elapsed / (5 * 3600)))
+  local window_start_epoch=$((anchor_epoch + window_n * 5 * 3600))
+  local reset_epoch=$((anchor_epoch + (window_n + 1) * 5 * 3600))
+
+  # ISO timestamp for window_start (used as the jq filter lower bound).
+  local window_start_iso
+  window_start_iso=$(date -u -r "$window_start_epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null \
+                      || date -u -d "@$window_start_epoch" +"%Y-%m-%dT%H:%M:%SZ")
+
+  # Count unique requests in the CURRENT tumbling window only.
   local m_session
   m_session=$(find "$PROJ_DIR" -maxdepth 2 -name '*.jsonl' -type f 2>/dev/null \
     | xargs -L 50 -P 1 cat 2>/dev/null \
-    | jq -rs --arg since "$ss" '
+    | jq -rs --arg since "$window_start_iso" '
         [.[] | select(.type == "assistant" and .message.usage != null and (.timestamp // "") >= $since) | (.requestId // "")]
         | unique | map(select(. != "")) | length
       ' 2>/dev/null)
   [ -z "$m_session" ] && m_session=0
 
-  # Usage bar (based on session-anchored count, not raw 5h count)
+  # Usage bar
   local pct color
   pct=$(awk -v u="$m_session" -v q="$quota" 'BEGIN { printf "%.0f", (u*100)/q }')
   if   [ "$pct" -ge 80 ]; then color="$C_RED"
@@ -400,14 +427,19 @@ plan_block() {
     "$color" "$pct" "$C_RESET"
 
   if [ "$m_session" -le 0 ]; then
-    printf '    %s(no activity in current session)%s\n' "$C_DIM" "$C_RESET"
+    printf '    %s(no activity in current 5h window — full budget available)%s\n' "$C_DIM" "$C_RESET"
+    # Still show reset countdown so user knows when next window begins
+    local reset_in=$((reset_epoch - now_epoch))
+    if [ "$reset_in" -gt 0 ]; then
+      printf '    Resets:   %s in %s%s  %s(end of current 5h block)%s\n' \
+        "$C_GREEN" "$(human_dur "$reset_in")" "$C_RESET" "$C_DIM" "$C_RESET"
+    fi
     return
   fi
 
-  local window_age=$((now_epoch - ss_epoch))
-  [ "$window_age" -lt 60 ] && window_age=60   # avoid div-by-zero on very fresh sessions
+  local window_age=$((now_epoch - window_start_epoch))
+  [ "$window_age" -lt 60 ] && window_age=60   # avoid div-by-zero on very fresh blocks
   local m5="$m_session"
-  local oldest_epoch="$ss_epoch"   # for the rest of the function below — session start is our anchor
 
   local rate_per_hr; rate_per_hr=$(awk -v m="$m5" -v s="$window_age" 'BEGIN { printf "%.0f", (m*3600)/s }')
   local remaining=$((quota - m5))
@@ -421,14 +453,14 @@ plan_block() {
       "$C_RED" "$((m5 - quota))" "$C_RESET"
   fi
 
-  # Reset = session_start + 5h (when this session's window expires).
-  # Note: this matches Anthropic's "Resets in N hours" countdown, which
-  # anchors at session-start, not at the rolling 5h edge.
-  local reset_epoch=$((oldest_epoch + 5*3600))
+  # Reset = end of the current tumbling 5h window. reset_epoch was
+  # computed above as anchor + (window_n+1) * 5h. This matches Anthropic's
+  # "Resets in N hours" countdown.
   local reset_in=$((reset_epoch - now_epoch))
   if [ "$reset_in" -gt 0 ]; then
-    printf '    Resets:   %s in %s%s  %s(5h after session-start)%s\n' \
-      "$C_GREEN" "$(human_dur "$reset_in")" "$C_RESET" "$C_DIM" "$C_RESET"
+    printf '    Resets:   %s in %s%s  %s(end of current 5h block, window #%d since %s)%s\n' \
+      "$C_GREEN" "$(human_dur "$reset_in")" "$C_RESET" \
+      "$C_DIM" "$((window_n + 1))" "$(echo "$anchor" | cut -c1-10)" "$C_RESET"
   fi
 }
 
@@ -518,7 +550,7 @@ render() {
 
   # ── Plan budget (anchored to 5h rate-limit window, independent of WINDOW_SEC) ──
   if [ -n "${CC_PLAN:-}" ]; then
-    printf '\n%s🎯  Plan budget%s %s(current session — anchored at first request after %s+ min idle)%s\n' "$C_MAG" "$C_RESET" "$C_DIM" "${CC_SESSION_GAP_MIN:-30}" "$C_RESET"
+    printf '\n%s🎯  Plan budget%s %s(current 5h tumbling window, anchored from first request after %dh+ idle)%s\n' "$C_MAG" "$C_RESET" "$C_DIM" "$(( ${CC_SESSION_GAP_MIN:-300} / 60 ))" "$C_RESET"
     local agg5; agg5=$(sum_all "$since_5h")
     local m5=0
     [ -n "$agg5" ] && m5=$(echo "$agg5" | jq -r '.messages')

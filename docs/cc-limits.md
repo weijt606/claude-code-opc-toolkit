@@ -88,13 +88,19 @@ export CC_PLAN_MSG_LIMIT_5H=2000
 cc-limits --plan max20 --quota 2000
 ```
 
-### Session anchoring
+### Tumbling 5-hour windows (how anchoring really works)
 
-The budget counts requests from the start of your **current session** (the first request after a quiet period), not the full rolling 5h window. This matches how Anthropic's `claude.ai/settings/usage` "Current session" counter behaves. The default idle threshold is **30 minutes**:
+Anthropic doesn't use a rolling 5h window or gap-based detection inside it. They use **tumbling 5-hour blocks anchored at your first request of the day** (or first request after a multi-hour break). Window 1 = `[anchor, anchor+5h]`, window 2 = `[anchor+5h, anchor+10h]`, etc. Reset countdown = end of the current block.
+
+`cc-limits` replicates this: it looks back **24 hours** of transcripts (`CC_ANCHOR_LOOKBACK_HOURS=24`), finds the first request after a gap of at least **5 hours** (`CC_SESSION_GAP_MIN=300` minutes — i.e., a fully-elapsed window of inactivity), and uses that as the anchor. Then it computes which 5h block you're currently in, and counts messages **within that block only**.
+
+A 30-minute lunch break or even a 3-hour gap doesn't reset the anchor — only a full 5h+ break does. This matches Anthropic's `claude.ai/settings/usage` behavior empirically (verified 2026-05-09: tool's reset countdown matches dashboard within ~2 minutes).
+
+Tunables (rarely needed):
 
 ```bash
-export CC_SESSION_GAP_MIN=60   # 1h+ gap = new session (more conservative)
-export CC_SESSION_GAP_MIN=15   # 15min+ gap = new session (more aggressive)
+export CC_SESSION_GAP_MIN=300         # default: 5h+ gap counts as a fresh anchor
+export CC_ANCHOR_LOOKBACK_HOURS=24    # default: how far back to search for the original anchor
 ```
 
 ### Calibrating against your real dashboard reading

@@ -88,13 +88,19 @@ export CC_PLAN_MSG_LIMIT_5H=2000
 cc-limits --plan max20 --quota 2000
 ```
 
-### Session 锚点
+### 翻滚式 5 小时窗口（锚点的真实工作方式）
 
-预算只统计**当前 session 起**（最近一次安静期后第一条请求开始）的请求数，**不是**整个 5h 滚动窗口。这跟 `claude.ai/settings/usage` 的 "Current session" 计数器行为一致。默认空闲阈值 **30 分钟**：
+Anthropic 既不用滚动 5h 窗口，也不在窗口内做 gap detection。它用的是**从你当天第一次请求开始的翻滚 5 小时块**（tumbling windows）：第一段窗口 = `[anchor, anchor+5h]`、第二段 = `[anchor+5h, anchor+10h]`，依此类推。Reset 倒计时 = 当前块结束的时间。
+
+`cc-limits` 现在复现了这个模型：往回看 **24 小时**的 transcript（`CC_ANCHOR_LOOKBACK_HOURS=24`），找最近一次**至少 5 小时**的间隔（`CC_SESSION_GAP_MIN=300` 分钟，即"一整个窗口的无活动"），把间隔结束后的第一条请求当作锚点。然后算你当前在哪个 5h 块里，**只统计当前块内的消息数**。
+
+30 分钟的午休、甚至 3 小时的间隔都不会重置锚点 —— 只有完整的 5h+ 中断才会。这跟 `claude.ai/settings/usage` 的实测行为一致（2026-05-09 验证：工具的 reset 倒计时跟 dashboard 误差约 2 分钟）。
+
+可调参数（很少需要动）：
 
 ```bash
-export CC_SESSION_GAP_MIN=60   # 1h+ 空闲才算新 session（更保守）
-export CC_SESSION_GAP_MIN=15   # 15min+ 空闲就算新 session（更激进）
+export CC_SESSION_GAP_MIN=300         # 默认：5h+ 间隔才算重新锚定
+export CC_ANCHOR_LOOKBACK_HOURS=24    # 默认：往回看多久找原始锚点
 ```
 
 ### 用真实 dashboard 校准
