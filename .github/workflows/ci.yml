@@ -29,12 +29,22 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install -y shellcheck
-          # SC1090/SC1091: source warnings (we source dynamic paths intentionally)
-          # SC2155: declare and assign separately (we accept inline for terseness)
-          # SC2086: word splitting on unquoted vars (manageable in this codebase)
+          # Excluded checks (with rationale):
+          #   SC1090/SC1091  source warnings — we source dynamic paths
+          #                   (e.g. ~/.claude/monitor/cc-plan.conf) intentionally
+          #   SC2155          declare and assign separately — we accept the
+          #                   inline form for readability in error-handling code
+          #   SC2086          word splitting on unquoted vars — handled in this
+          #                   codebase via controlled inputs (UUIDs, ISO dates)
+          #   SC2038          `find | xargs` non-alphanumeric — our filenames
+          #                   are session UUIDs and ISO timestamps; never have
+          #                   special chars
+          #   SC2034          unused color variable — we keep the full color
+          #                   palette declared even when one is currently unused
+          #                   so future edits don't have to re-declare it
           shellcheck \
             --severity=warning \
-            --exclude=SC1090,SC1091,SC2155,SC2086 \
+            --exclude=SC1090,SC1091,SC2155,SC2086,SC2038,SC2034 \
             $(find . -type f -name '*.sh' -not -path './.git/*')
 
   jq-syntax:
@@ -56,13 +66,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: check ./* links exist
+      - name: check ./* links exist (directory-aware, fragment-stripping)
         run: |
           set -e
-          for f in $(grep -hoE '\(\./[^)]+\)' README.md README.zh-CN.md statuslines/README.md | sed 's/[()]//g' | sort -u); do
-            rel=${f#./}
-            if [ ! -e "$rel" ]; then
-              echo "::error::missing referenced path: $f"
-              exit 1
-            fi
+          # Each README's `./xxx` and `../xxx` links are relative to that
+          # README's own directory, not the repo root. Anchor fragments
+          # (#section-name) need to be stripped before checking.
+          fail=0
+          for md in README.md README.zh-CN.md CONTRIBUTING.md CHANGELOG.md \
+                    statuslines/README.md \
+                    docs/cc-limits.md docs/cc-limits.zh-CN.md \
+                    docs/cc-pilot.md docs/cc-pilot.zh-CN.md; do
+            [ -f "$md" ] || continue
+            md_dir=$(dirname "$md")
+            # Match (./xxx) and (../xxx); strip URL fragments (#anchor)
+            for f in $(grep -hoE '\((\./|\.\./)[^)#]+' "$md" | sed 's/^(//' | sort -u); do
+              rel="${md_dir}/${f}"
+              if [ ! -e "$rel" ]; then
+                echo "::error file=$md::broken link to $f (resolves to $rel)"
+                fail=1
+              fi
+            done
           done
+          [ "$fail" -eq 0 ]

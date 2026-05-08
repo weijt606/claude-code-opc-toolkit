@@ -72,81 +72,16 @@ cc-resume                     # fzf picker — pick any past session, Enter to r
 
 ```bash
 cc-limits                          # default: last 24 hours
-cc-limits -30m                     # last 30 minutes
-cc-limits -1h                      # last 1 hour
-cc-limits -7d                      # last 7 days
-cc-limits -30d                     # last 30 days
-cc-limits --last 6h                # long form
-cc-limits -7d --watch              # auto-refresh
-cc-limits --plan max5              # add plan-aware budget block (see below)
+cc-limits -1h                      # custom window: -30m | -1h | -7d | -30d | --last 6h
+cc-limits --plan max5 --watch      # add 5h plan budget + auto-refresh
+cc-limits --calibrate 60           # anchor budget % to your dashboard reading
 ```
 
-Every window shows: live processes · aggregate metrics for the window (input / output / cache / cost / per-model) · plan budget if `CC_PLAN` is set (always 5h-anchored, regardless of window) · top sessions by output in the window.
+Every window shows: live processes · window aggregates (tokens / cost / per-model) · plan budget if `CC_PLAN` is set (always 5h-anchored) · top sessions by output.
 
-**Pricing override** — defaults assume Opus 4. Override per-call:
+Plan-aware budget supports `pro | max5 | max20 | team | free | api`. Defaults are best-effort; `--calibrate <pct>` anchors local % to whatever `claude.ai/settings/usage` actually shows you (Anthropic's metering is token-weighted and opaque).
 
-```bash
-# Sonnet 4
-CC_PRICE_INPUT=3 CC_PRICE_OUTPUT=15 CC_PRICE_CACHE_WRITE=3.75 CC_PRICE_CACHE_READ=0.30 cc-limits
-
-# Haiku 4
-CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5  CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ=0.10 cc-limits
-```
-
-**Plan-aware budget** — set `CC_PLAN` (or pass `--plan`) to see estimated session budget %, burn rate, and reset countdown:
-
-```bash
-export CC_PLAN=max5       # or: pro | max5 | max20 | team | free | api
-cc-limits
-
-# Output gains a "🎯 Plan budget" block:
-#
-#     Claude Max 5× ($100/mo)  (CC_PLAN=max5)   ⚠ estimated, not authoritative
-#     Usage:    145 / ~450 msgs   ████░░░░░░░░░░  32%
-#     Burn:     123 msg/hr  →  exhaust in ~2h 28m
-#     Resets:   in 3h 49m  (5h after session-start)
-```
-
-**Session anchoring**: the budget counts requests from the start of your **current session** (the first request after a quiet period), not the full rolling 5h. This matches how Anthropic's `claude.ai/settings/usage` "Current session" counter behaves. The default idle threshold is **30 minutes**; tune via:
-
-```bash
-export CC_SESSION_GAP_MIN=60   # 1h+ gap = new session (more conservative)
-export CC_SESSION_GAP_MIN=15   # 15min+ gap = new session (more aggressive)
-```
-
-**Calibrating against your real dashboard reading**: the plan defaults (Pro ~90, Max 5× ~450, etc.) come from Anthropic's published guidance, but their internal `% used` is **opaque-weighted by request size/complexity**, so a static "count ÷ cap" estimate drifts. If `cc-limits --plan max5` says 45% but `claude.ai/settings/usage` says 60%, anchor the tool to your reality:
-
-```bash
-cc-limits --calibrate 60         # "I see 60% on the dashboard right now"
-# → Computes your effective cap from the current request count
-# → Saves to ~/.claude/monitor/cc-plan.conf
-# → Future runs use the calibrated cap, marked "✓ calibrated"
-```
-
-Re-calibrate periodically when the underlying weight function drifts. Revert anytime:
-
-```bash
-cc-limits --calibrate-clear      # back to plan defaults
-```
-
-Defaults (verified **2026-05-07**, reflecting Anthropic's 2026-05-06 announcement that Claude Code 5h limits **doubled** for all paid tiers):
-
-| Plan | 5h cap | Source flag |
-|------|--------|------------|
-| Free | ~10 | `--plan free` |
-| Pro | ~90 | `--plan pro` |
-| Max 5× ($100/mo) | ~450 | `--plan max5` (or `--plan max`) |
-| Max 20× ($200/mo) | ~1800 | `--plan max20` |
-| Team (per seat) | ~450 | `--plan team` |
-| API | no cap | `--plan api` |
-
-Override when Anthropic adjusts published quotas:
-
-```bash
-export CC_PLAN_MSG_LIMIT_5H=2000   # or: cc-limits --plan max20 --quota 2000
-```
-
-> ⚠️ **Anthropic does not expose subscription quota state via any public API**, and metering is **token-based** (a prompt with a big attachment can burn 10× a normal message). The plan budget block is a *local-data approximation*: 5h message count ÷ community-known published cap. Useful as a guardrail, **not** authoritative — server-side throttling can hit earlier or later than the bar suggests. There's also a **separate weekly cap** that this tool does not yet model. On Claude Pro/Max the cost line shows "value at API rates", not a real bill.
+**Full reference**: [`docs/cc-limits.md`](./docs/cc-limits.md) — pricing overrides for Sonnet/Haiku, session-anchor tuning, why `% used` drifts, weekly-cap caveats, watch-mode env vars.
 
 ### Daily worklog: `cc-daily`
 
@@ -171,67 +106,28 @@ cc-skill-init my-utility --global         # ~/.claude/skills/ instead of ./.clau
 
 Generates a complete skill structure (`SKILL.md` with frontmatter and `Step 0 · Context check`, `README.md`, `prompts/starter.md`, empty `templates/` and `examples/`).
 
-### Reduce permission prompts: `cc-pilot suggest`
+### Reduce permission prompts: `cc-pilot`
 
-Tired of clicking "yes" on the same `git status`, `npm test`, `ls -la` 50× a day? Have `cc-pilot` learn from your history and suggest a refined `permissions.allow` block:
-
-```bash
-cc-pilot suggest                    # last 7d, ≥5 invocations, default
-cc-pilot suggest --days 14          # widen the window
-cc-pilot suggest --min-count 3      # lower the bar
-cc-pilot suggest -y                 # skip the merge confirmation
-```
-
-What it does:
-1. Walks your transcripts in the time window, extracts every Bash command Claude actually ran
-2. Derives a permission pattern (e.g. `git status -s` → `Bash(git status*)`)
-3. Filters out anything that ever appeared in a destructive context (substring-matched against a built-in deny list: `rm -rf`, `git push --force`, `git reset --hard`, `sudo`, `curl `, `wget `, `dd if=`, `mkfs`, `chmod -R`, redirects to `/etc/`/`/usr/`/`/System/`, etc.)
-4. Skips read-only inspectors (`grep`, `find`, `cat`, `ls`, `awk`, …) so commands like `grep -n "rm -rf" *.sh` aren't false-positive flagged
-5. Drops patterns already in your `permissions.allow`
-6. Shows three sections: ✅ Recommended · ℹ️ Already allowed · 🚫 Blocked (with the exact triggering command displayed)
-7. Asks `[y/N]` before merging — backs up `~/.claude/settings.json` first
-
-Sample output:
-
-```
-✅ Recommended (safe, ≥5 invocations, not yet allowed)
-    133×  Bash(grep -n*)
-    102×  Bash(pnpm --filter*)
-     57×  Bash(git status*)
-     ...
-
-🚫 Blocked from auto-suggesting (at least one invocation matched the destructive deny list)
-    112×  Bash(git add*)
-         triggered by: git add . && git push --force origin main
-     25×  Bash(curl -s*)
-         triggered by: curl -s https://api.github.com/repos/...
-
-Add these 39 pattern(s) to ~/.claude/settings.json [permissions.allow]? [y/N]
-```
-
-When a pattern is blocked, the "triggered by" line tells you why so you can manually refine (e.g. allow `Bash(git add)` exact-match instead of the wildcard `Bash(git add*)` that picked up a force-push).
-
-### Permission profiles: `cc-pilot safe` / `dev` / `yolo`
-
-Launch Claude Code with a session-scoped permission profile — no permanent settings change, no merge into your global config:
+Three subcommands sharing one goal: stop clicking "yes" on routine prompts without opening up destructive operations.
 
 ```bash
-cc-pilot safe                      # read-only profile
-cc-pilot dev                       # safe + Edit/Write + builds/tests + reversible git
-cc-pilot yolo                      # --dangerously-skip-permissions, with preflight
-cc-pilot show dev                  # see exactly what dev allows / denies
-cc-pilot list-profiles             # available profiles
+cc-pilot suggest      # learn from past approvals → recommend permissions.allow patterns
+cc-pilot safe         # launch with read-only profile
+cc-pilot dev          # launch with safe + builds + reversible git profile
+cc-pilot yolo         # launch with --dangerously-skip-permissions (preflight gated)
 ```
 
-| Profile | Allows | Denies | Risk |
-|---------|--------|--------|------|
-| `safe` | Read/Glob/Grep + read-only Bash (`ls`, `cat`, `grep`, `find`, `awk`, read-only `git`, etc.) | (nothing — pure additive over default) | 🟢 nearly zero |
-| `dev` | Everything in safe + `Edit`/`Write` + build & test runners (`npm`, `pnpm`, `yarn`, `cargo`, `go test`, `pytest`, `make`, `mvn`, `dotnet`, …) + reversible git (`add`, `commit`, `stash`, `pull`, `fetch`, plain `push`) | Force-push, hard-reset, `rm -rf`, `sudo`, curl-piped-to-shell, `chmod -R` | 🟡 medium — but git rollback covers most damage |
-| `yolo` | Everything (bypassPermissions = true) | (nothing — that's the point) | 🔴 high — only inside a worktree / container |
+All three are session-scoped and use only official Claude Code flags (`--allowed-tools`, `--disallowed-tools`, `--dangerously-skip-permissions`).
 
-**`yolo` won't start unless** you're inside a git repo, your working tree is clean, AND your current branch is **not** `main` / `master` / `develop` / `prod` / `production` / `release` / `stable`. If any precondition fails, the tool exits with the exact reason. Override with `--i-understand-the-risk`.
+| Profile | Risk | Refuses to start unless… |
+|---------|:----:|--------------------------|
+| `safe` | 🟢 | (no preconditions — always safe to launch) |
+| `dev` | 🟡 | (no preconditions, but explicit deny list blocks force-push, `rm -rf`, `sudo`, etc.) |
+| `yolo` | 🔴 | inside a git repo · working tree clean · branch ≠ `main`/`master`/`develop`/`prod`/`production`/`release`/`stable`. Override with `--i-understand-the-risk`. |
 
-Profiles are plain-text files (`pilot/profiles/<name>.allow`, `<name>.deny`) — one [Claude Code permission rule](https://docs.claude.com/en/docs/claude-code/iam) per line, `#` for comments. **PRs welcome to extend `dev.allow` with build verbs for languages we don't yet cover.**
+Profiles are plain-text files in [`pilot/profiles/`](./pilot/profiles/) — one [Claude Code permission rule](https://docs.claude.com/en/docs/claude-code/iam) per line, `#` for comments. PRs welcome to extend `dev.allow` for languages we don't yet cover.
+
+**Full reference**: [`docs/cc-pilot.md`](./docs/cc-pilot.md) — full deny-list, read-only-verb whitelist, suggest output explained, all profile contents, yolo preflight rules.
 
 ### Statusline gallery
 

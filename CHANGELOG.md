@@ -46,4 +46,4 @@ and this project adheres to [CalVer](https://calver.org/) (`vYYYY.MM.DD`) for re
 - `cc-skill-init <name>`: scaffold Claude Code skills with frontmatter, Step-0 read-context block, README, prompts, templates/examples dirs.
 - 7 plug-and-play `statusLine` scripts (default-opc, cost-watch, session-density, pomodoro, minimal, build-in-public, bilingual-cn) with `sl-*` swap aliases.
 - 4 hook events wired into `~/.claude/monitor/events.jsonl`: `SessionStart` / `SessionEnd` / `UserPromptSubmit` / `SubagentStop`.
-- Bilingual READMEs (English + 中文), MIT license.
+- Bilingual READMEs (English + Chinese), MIT license.

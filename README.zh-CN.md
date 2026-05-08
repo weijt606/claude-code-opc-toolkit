@@ -72,81 +72,16 @@ cc-resume                     # fzf 选择 → 回任意历史 session
 
 ```bash
 cc-limits                          # 默认：最近 24 小时
-cc-limits -30m                     # 最近 30 分钟
-cc-limits -1h                      # 最近 1 小时
-cc-limits -7d                      # 最近 7 天
-cc-limits -30d                     # 最近 30 天
-cc-limits --last 6h                # 长写法
-cc-limits -7d --watch              # 自动刷新
-cc-limits --plan max5              # 加上 plan-aware 预算块（见下）
+cc-limits -1h                      # 自定义窗口：-30m | -1h | -7d | -30d | --last 6h
+cc-limits --plan max5 --watch      # 加 5h plan 预算 + 自动刷新
+cc-limits --calibrate 60           # 把预算 % 锚定到 dashboard 真实读数
 ```
 
-任何窗口都展示：活跃进程 · 该窗口的聚合数据（input / output / cache / 费用 / 按模型分类）· plan 预算（设了 `CC_PLAN` 才有，**永远锚定 5h 滚动窗口**）· 该窗口内输出 token 最多的 top sessions。
+每个窗口都展示：活跃进程 · 该窗口聚合数据（token / 费用 / 按模型分类）· plan 预算（设了 `CC_PLAN` 才有，永远锚定 5h 滚动窗口）· top sessions。
 
-**价格覆盖** —— 默认按 Opus 4 公开费率：
+Plan 预算支持档位：`pro | max5 | max20 | team | free | api`。默认值是尽力估算；`--calibrate <pct>` 把本地 % 锚定到 `claude.ai/settings/usage` 真实读数（Anthropic 计费按 token 加权且不透明）。
 
-```bash
-# Sonnet 4
-CC_PRICE_INPUT=3 CC_PRICE_OUTPUT=15 CC_PRICE_CACHE_WRITE=3.75 CC_PRICE_CACHE_READ=0.30 cc-limits
-
-# Haiku 4
-CC_PRICE_INPUT=1 CC_PRICE_OUTPUT=5  CC_PRICE_CACHE_WRITE=1.25 CC_PRICE_CACHE_READ=0.10 cc-limits
-```
-
-**Plan-aware 预算** —— 设置 `CC_PLAN`（或传 `--plan`），即可看到当前 session 的估算用量百分比、burn rate 与重置倒计时：
-
-```bash
-export CC_PLAN=max5       # 可选值：pro | max5 | max20 | team | free | api
-cc-limits
-
-# 输出多出 "🎯 Plan budget" 块：
-#
-#     Claude Max 5× ($100/mo)  (CC_PLAN=max5)   ⚠ estimated, not authoritative
-#     Usage:    145 / ~450 msgs   ████░░░░░░░░░░  32%
-#     Burn:     123 msg/hr  →  exhaust in ~2h 28m
-#     Resets:   in 3h 49m  (5h after session-start)
-```
-
-**Session 锚点**：预算只统计**当前 session 起**（最近一次安静期后第一条请求开始）的请求数，**不是**整个 5h 滚动窗口。这跟 `claude.ai/settings/usage` 的 "Current session" 计数器行为一致。默认空闲阈值 **30 分钟**，可通过：
-
-```bash
-export CC_SESSION_GAP_MIN=60   # 1h+ 空闲才算新 session（更保守）
-export CC_SESSION_GAP_MIN=15   # 15min+ 空闲就算新 session（更激进）
-```
-
-**根据真实 dashboard 校准**：plan 默认值（Pro ~90、Max 5× ~450 等）来自 Anthropic 的公开声明，但他们内部的 `% used` 是按 request 大小/复杂度**不透明加权**计算的，所以静态的 "count ÷ cap" 估算会漂移。如果 `cc-limits --plan max5` 显示 45% 但 `claude.ai/settings/usage` 显示 60%，把工具锚定到真实读数：
-
-```bash
-cc-limits --calibrate 60         # "我现在 dashboard 上看到 60%"
-# → 用当前请求数反算你的有效 cap
-# → 保存到 ~/.claude/monitor/cc-plan.conf
-# → 后续运行就用这个校准后的 cap，标记为 "✓ calibrated"
-```
-
-加权函数漂移时定期重新校准。任何时候可以撤销：
-
-```bash
-cc-limits --calibrate-clear      # 回到 plan 默认值
-```
-
-默认配额（**2026-05-07** 校对，已反映 Anthropic 2026-05-06 公告：Claude Code 5h 上限对所有付费档**翻倍**）：
-
-| 档位 | 5h 上限 | 参数 |
-|------|---------|------|
-| Free | ~10 | `--plan free` |
-| Pro | ~90 | `--plan pro` |
-| Max 5× ($100/月) | ~450 | `--plan max5`（也可用 `--plan max`）|
-| Max 20× ($200/月) | ~1800 | `--plan max20` |
-| Team（按席）| ~450 | `--plan team` |
-| API | 无（cost-based）| `--plan api` |
-
-Anthropic 调整配额时手动覆盖：
-
-```bash
-export CC_PLAN_MSG_LIMIT_5H=2000   # 或：cc-limits --plan max20 --quota 2000
-```
-
-> ⚠️ **Anthropic 没有公开订阅档配额的 API**，且按 **token** 计而不是 message（一条带大附件的 prompt 可能消耗 10 倍配额）。这个 plan 预算块是**本地数据的近似估算**：5 小时窗口的 message 数 ÷ 社区已知的公开配额上限。把它当 guardrail，**不要**当权威 —— 实际限流可能早于或晚于进度条暗示。**还有一个独立的"周限额"目前本工具尚未建模**。订阅 Pro/Max 时，费用行展示的是"按 API 价格折算的价值"，不是真实账单。
+**完整参考**：[`docs/cc-limits.zh-CN.md`](./docs/cc-limits.zh-CN.md) —— Sonnet/Haiku 价格覆盖、session-anchor 调参、`% used` 为何漂移、周限额说明、watch 模式环境变量。
 
 ### 每日工作日志：`cc-daily`
 
@@ -171,67 +106,28 @@ cc-skill-init my-utility --global         # 放到 ~/.claude/skills/，所有项
 
 生成完整的 Skill 结构：带 frontmatter 与 `Step 0 · Context check` 的 `SKILL.md`、面向人的 `README.md`、起手 prompt、空的 `templates/` 与 `examples/` 目录。
 
-### 减少权限提示：`cc-pilot suggest`
+### 减少权限提示：`cc-pilot`
 
-每天点 50 次 "yes" 批准 `git status`、`npm test`、`ls -la` 是不是已经麻木了？让 `cc-pilot` 从你的历史里学习，推荐一个精炼的 `permissions.allow` 块：
-
-```bash
-cc-pilot suggest                    # 默认 7 天窗口，≥5 次出现的模式
-cc-pilot suggest --days 14          # 拓宽窗口
-cc-pilot suggest --min-count 3      # 降低阈值
-cc-pilot suggest -y                 # 跳过合并确认
-```
-
-它做什么：
-1. 扫描时间窗口内所有 transcript，提取 Claude 实际跑过的每条 Bash 命令
-2. 推导出权限模式（例：`git status -s` → `Bash(git status*)`）
-3. 过滤掉**任何曾经在破坏性上下文中出现过**的模式（内置 deny list 子串匹配：`rm -rf`、`git push --force`、`git reset --hard`、`sudo`、`curl `、`wget `、`dd if=`、`mkfs`、`chmod -R`、重定向到 `/etc/`/`/usr/`/`/System/` 等）
-4. 跳过只读类命令（`grep`、`find`、`cat`、`ls`、`awk`…），避免 `grep -n "rm -rf" *.sh` 这种**只是在搜代码内容**的命令被误判
-5. 跳过已经在 `permissions.allow` 里的模式
-6. 三段输出：✅ 推荐 · ℹ️ 已存在 · 🚫 被拦截（**附触发拦截的具体命令**）
-7. 合并前**问 `[y/N]`**，先备份 `~/.claude/settings.json`
-
-输出示例：
-
-```
-✅ Recommended (safe, ≥5 invocations, not yet allowed)
-    133×  Bash(grep -n*)
-    102×  Bash(pnpm --filter*)
-     57×  Bash(git status*)
-     ...
-
-🚫 Blocked from auto-suggesting (at least one invocation matched the destructive deny list)
-    112×  Bash(git add*)
-         triggered by: git add . && git push --force origin main
-     25×  Bash(curl -s*)
-         triggered by: curl -s https://api.github.com/repos/...
-
-Add these 39 pattern(s) to ~/.claude/settings.json [permissions.allow]? [y/N]
-```
-
-**模式被拦截时**，"triggered by" 那行告诉你**为什么** —— 你可以手动精细化处理（比如改成精确匹配 `Bash(git add)` 而不是通配 `Bash(git add*)`，避免一条 force-push 污染整个模式）。
-
-### 权限 profile：`cc-pilot safe` / `dev` / `yolo`
-
-用 session 级的权限 profile 启动 Claude Code —— 不会永久改你的 settings，也不会污染全局配置：
+三个子命令，一个共同目标：少点几次 "yes"，但不要因此打开破坏性操作的口子。
 
 ```bash
-cc-pilot safe                      # 只读 profile
-cc-pilot dev                       # safe + Edit/Write + 构建/测试 + 可回滚 git
-cc-pilot yolo                      # --dangerously-skip-permissions，启动前预检
-cc-pilot show dev                  # 查看 dev 具体允许 / 禁止什么
-cc-pilot list-profiles             # 列出可用 profiles
+cc-pilot suggest      # 从历史批准记录推导 permissions.allow 规则
+cc-pilot safe         # 用只读 profile 启动
+cc-pilot dev          # 用 safe + 构建 + 可回滚 git profile 启动
+cc-pilot yolo         # 用 --dangerously-skip-permissions 启动（启动前预检）
 ```
 
-| Profile | 允许 | 禁止 | 风险 |
-|---------|------|------|------|
-| `safe` | Read/Glob/Grep + 只读 Bash（`ls`、`cat`、`grep`、`find`、`awk`、只读 `git` 等）| （无 —— 纯加白）| 🟢 几乎为零 |
-| `dev` | safe 全部 + `Edit`/`Write` + 构建测试工具（`npm`、`pnpm`、`yarn`、`cargo`、`go test`、`pytest`、`make`、`mvn`、`dotnet` 等）+ 可回滚 git（`add`、`commit`、`stash`、`pull`、`fetch`、普通 `push`）| force-push、hard reset、`rm -rf`、`sudo`、curl-piped-to-shell、`chmod -R` | 🟡 中 —— git 回滚能覆盖大部分损害 |
-| `yolo` | 一切（bypassPermissions = true）| （无 —— 这就是 yolo 的意义）| 🔴 高 —— **仅在 worktree / 容器中用** |
+三个命令都是 session 级，只用官方 Claude Code 标志（`--allowed-tools`、`--disallowed-tools`、`--dangerously-skip-permissions`）。
 
-**`yolo` 不会启动**，除非：(a) 你在 git 仓库里，(b) 工作树干净（无未提交修改），(c) 当前分支**不是** `main` / `master` / `develop` / `prod` / `production` / `release` / `stable`。任一条件不满足，工具立即退出并打印具体原因。强行越过用 `--i-understand-the-risk`。
+| Profile | 风险 | 启动前置条件 |
+|---------|:----:|------------|
+| `safe` | 🟢 | （无前置 —— 永远可以启动）|
+| `dev` | 🟡 | （无前置，但显式 deny list 拦截 force-push、`rm -rf`、`sudo` 等）|
+| `yolo` | 🔴 | 在 git 仓库内 · 工作树干净 · 分支不是 `main`/`master`/`develop`/`prod`/`production`/`release`/`stable`。强行越过用 `--i-understand-the-risk` |
 
-Profile 是纯文本文件（`pilot/profiles/<name>.allow`、`<name>.deny`），每行一条 [Claude Code 权限规则](https://docs.claude.com/en/docs/claude-code/iam)，`#` 开头是注释。**欢迎 PR 给 `dev.allow` 补充我们尚未覆盖的语言/工具的构建命令。**
+Profile 是 [`pilot/profiles/`](./pilot/profiles/) 下的纯文本文件 —— 每行一条 [Claude Code 权限规则](https://docs.claude.com/en/docs/claude-code/iam)，`#` 是注释。欢迎 PR 给 `dev.allow` 补充我们尚未覆盖的语言。
+
+**完整参考**：[`docs/cc-pilot.zh-CN.md`](./docs/cc-pilot.zh-CN.md) —— 完整 deny list、只读 verb 白名单、suggest 输出详解、各 profile 内容、yolo 预检规则。
 
 ### 状态栏模板库
 

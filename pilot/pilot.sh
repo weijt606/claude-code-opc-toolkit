@@ -305,11 +305,13 @@ HEREDOC_TAILS="EOF|EOL|HEREDOC|done|fi|else|elif|then|esac|do|while|for|case"
 #   - 2+ tokens → Bash(<tok1> <tok2>*) prefix-wildcard
 # Returns "" if the command isn't a real command (heredoc artifact, etc.).
 derive_pattern() {
-  local cmd="$1"
-  # Strip leading whitespace
-  cmd="${cmd#"${cmd%%[![:space:]]*}"}"
+  # `c` rather than `cmd` so shellcheck doesn't conflate this string-typed
+  # local with launch_with_profile()'s array-typed `cmd` (different scopes,
+  # different types — but SC2178 doesn't track scope).
+  local c="$1"
+  c="${c#"${c%%[![:space:]]*}"}"
   local tok1 tok2 rest
-  read -r tok1 tok2 rest <<< "$cmd"
+  read -r tok1 tok2 rest <<< "$c"
   [ -z "$tok1" ] && return
   # Reject heredoc artifacts (single-char tokens like \, control words like fi/done/EOF).
   [ "${#tok1}" -lt 2 ] && return
@@ -328,12 +330,12 @@ derive_pattern() {
 # when the first token is a read-only inspector (so e.g. `grep "rm -rf"`
 # isn't flagged for the data it's reading).
 is_dangerous() {
-  local cmd="$1"
-  cmd="${cmd#"${cmd%%[![:space:]]*}"}"
-  local tok1; read -r tok1 _ <<< "$cmd"
+  local c="$1"
+  c="${c#"${c%%[![:space:]]*}"}"
+  local tok1; read -r tok1 _ <<< "$c"
   if [[ "$tok1" =~ ^($READ_ONLY_VERBS)$ ]]; then return 1; fi
   for pat in "${DENY_PATTERNS[@]}"; do
-    if [[ "$cmd" == *"$pat"* ]]; then return 0; fi
+    if [[ "$c" == *"$pat"* ]]; then return 0; fi
   done
   return 1
 }
