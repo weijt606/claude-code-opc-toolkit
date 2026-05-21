@@ -25,19 +25,35 @@
 #                                           cache_read_input_tokens, model}
 #   2. ~/.claude/sessions/<pid>.json    — live processes (sessionId, cwd, status, pid)
 #
+# RELATIONSHIP TO `/usage`
+#   Claude Code now ships a built-in `/usage` slash command (run it inside any
+#   Claude Code session). For Pro/Max/Team subscribers, `/usage` shows the
+#   AUTHORITATIVE 5h plan-usage bar straight from Anthropic's server — that's
+#   the truth for "where am I right now on the rate limit". This script does
+#   NOT compete with `/usage`; it does what `/usage` doesn't:
+#     - cross-project / cross-pid live process view
+#     - arbitrary historical windows (-30m, -1h, -7d, -30d)
+#     - cost + per-model breakdown across many sessions
+#     - top sessions by output ranking
+#     - watch mode + statusline integration
+#   Use `/usage` for ground truth on the current 5h block; use cc-limits for
+#   history, cost, and continuous monitoring.
+#
 # CAVEATS
-#   * Claude Code does NOT expose its internal rate-limit counter.
-#     The "last 5h" block here is an APPROXIMATION based on aggregated usage,
-#     not Anthropic's authoritative quota state.
+#   * The "Plan budget" block is a LOCAL APPROXIMATION based on aggregated
+#     usage. For authoritative numbers, run `/usage` inside Claude Code.
 #   * Pricing defaults assume Claude Opus 4 series (Anthropic published rates).
 #     Override with env vars (see PRICING below).
 #
-# PLAN-AWARE BUDGET (optional)
+# PLAN-AWARE BUDGET (optional, since `/usage` is now the authoritative source)
 #   Set CC_PLAN to one of: free | pro | max | max5 | max20 | team | api
 #     export CC_PLAN=max5             # or pass --plan max5
 #     (`max` is an alias for `max5`)
 #   This adds a "Plan budget" sub-block showing estimated usage %, burn
-#   rate, and reset countdown — all approximations from local data.
+#   rate, and reset countdown — all approximations from local data. It's
+#   most useful for statusline integration and watch mode (where running
+#   `/usage` repeatedly isn't ergonomic). For a one-off authoritative
+#   reading, just run `/usage` inside Claude Code instead.
 #
 #   Anchoring: the budget anchors at the start of your CURRENT SESSION,
 #   not the rolling 5h edge. A new session starts at the first request
@@ -368,9 +384,9 @@ plan_block() {
   printf '\n    %s%s%s' "$C_BOLD" "$label" "$C_RESET"
   printf '  %s(CC_PLAN=%s · cap %s)%s' "$C_DIM" "$plan" "$cap_source" "$C_RESET"
   if [ "$cap_source" = "default" ]; then
-    printf '   %s⚠ estimated, not authoritative%s\n' "$C_YELLOW" "$C_RESET"
+    printf '   %s⚠ local approximation — run /usage in Claude Code for authoritative %%%s\n' "$C_YELLOW" "$C_RESET"
   else
-    printf '   %s✓ calibrated to your dashboard%s\n' "$C_GREEN" "$C_RESET"
+    printf '   %s✓ calibrated (still local; /usage is the truth source)%s\n' "$C_GREEN" "$C_RESET"
   fi
 
   if [ "$quota" -le 0 ]; then
@@ -582,6 +598,8 @@ render() {
     "$C_DIM" "$C_RESET" "$C_DIM" "$PRICE_INPUT" "$PRICE_OUTPUT" "$PRICE_CACHE_WRITE" "$PRICE_CACHE_READ" "$C_RESET"
   printf '%sWindows%s: %s-30m · -1h · -24h (default) · -7d · -30d%s   %s+ --plan max5 · --watch%s\n' \
     "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET" "$C_DIM" "$C_RESET"
+  printf '%sFor authoritative current 5h quota %%, run %s/usage%s%s inside Claude Code.%s\n' \
+    "$C_DIM" "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
 }
 
 # ── Calibration mode: anchor the cap to your actual dashboard reading ──────
@@ -639,6 +657,10 @@ EOF
   echo "Future cc-limits runs will use this cap. Re-run --calibrate when Anthropic's"
   echo "weighting drifts (the % vs cap relationship isn't constant). Clear with"
   echo "--calibrate-clear to revert to plan defaults."
+  echo ""
+  echo "Note: since Claude Code shipped /usage, calibration is mostly useful for"
+  echo "statusline integration and watch mode. For one-off authoritative %, just"
+  echo "run /usage inside Claude Code — no calibration needed."
   exit 0
 fi
 

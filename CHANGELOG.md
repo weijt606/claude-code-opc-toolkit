@@ -7,6 +7,23 @@ and this project adheres to [CalVer](https://calver.org/) (`vYYYY.MM.DD`) for re
 
 ## [Unreleased]
 
+### Changed — `cc-limits` repositioned as complement to Claude Code's `/usage`
+
+Claude Code shipped a built-in [`/usage`](https://code.claude.com/docs/en/costs#using-the-usage-command) slash command that returns the **authoritative** current 5h plan-usage bar (server-side truth, not local approximation). `cc-limits` now positions itself explicitly as a complement, not a competitor:
+
+- **`/usage` owns**: current 5h quota %, real reset countdown.
+- **`cc-limits` owns**: cross-project / cross-pid live processes, arbitrary historical windows (-30m / -1h / -7d / -30d), cost in custom windows, per-model breakdown across many sessions, top-sessions ranking, watch mode, statusline integration.
+
+User-facing changes:
+
+- **Plan-budget block label**: `⚠ estimated, not authoritative` → `⚠ local approximation — run /usage in Claude Code for authoritative %`. Calibrated rows now say `✓ calibrated (still local; /usage is the truth source)`.
+- **New footer hint** on every `cc-limits` run: tells users to run `/usage` inside Claude Code for the authoritative reading.
+- **Calibration demoted from "recommended setup" to "optional"**. Since `/usage` now exists, calibration is only worth doing if you want a continuously displayed % in `cc-limits --watch` or in the `sl-cost` statusline. One-off readings should just use `/usage`. README, both docs/cc-limits.md (EN + ZH), and the `--calibrate` post-success message updated accordingly.
+- **README "Tools" table** rewords the `cc-limits` description to lead with cross-project history / watch / statusline integration and explicitly defer current-quota authority to `/usage`.
+- **Caveat** added in both READMEs and both docs/cc-limits files: prefer `/usage` for authoritative current-window %; cc-limits' approximation is for continuous display, not ground truth.
+
+No behavioral changes to the math — `cc-limits` still aggregates the same local-only data the same way. The change is purely positioning + labeling so users aren't misled into trusting cc-limits' local % over `/usage`'s server-side reading.
+
 ### Fixed — `cc-limits --calibrate` baseline mismatch
 
 - `--calibrate <pct>` was counting messages from the **original day-anchor** instead of the **current tumbling-window start**, so on a 3rd-window-of-the-day it summed up to 15h of requests instead of just the current ≤5h block. The resulting `cap = count / (pct/100)` was inflated 2-3×, and the live `Plan budget` block (which correctly counts only the current window) then displayed ~25% when the dashboard said 55%. Calibration now uses the same `anchor_ts() + window_n` math as `plan_block()` — `observed count` and the displayed `Usage` numerator are now from the same source.

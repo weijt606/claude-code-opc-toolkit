@@ -7,7 +7,7 @@ Plug-and-play `statusLine` scripts for Claude Code — pick the one that matches
 | Script | What it shows | Best for |
 |--------|---------------|----------|
 | [`default-opc.sh`](./default-opc.sh) | `📁 dir  ⎇ branch  ✨ model  ctx N%` | Daily driver — info-rich without clutter |
-| [`cost-watch.sh`](./cost-watch.sh) | `✨ model  ctx N%  ⏰5h $X  📅24h $Y` | High-intensity days — keep cost visible |
+| [`cost-watch.sh`](./cost-watch.sh) | `✨ model  ctx N%  ⏰5h $X  📅24h $Y` | High-intensity days — keep cost visible (the $ values are local estimates at API rates; for authoritative 5h plan-usage %, run `/usage` in Claude Code) |
 | [`session-density.sh`](./session-density.sh) | `📁 dir  sid:xxx  🟢 live 3/8  🤖 12` | Multi-session / multi-agent workflows |
 | [`pomodoro.sh`](./pomodoro.sh) | `🍅 task  📁 dir  ⏱  18:42 focus` | Focus mode — 25 min work / 5 min break |
 | [`minimal.sh`](./minimal.sh) | `model · dir` | Narrow terminals / minimalists |

@@ -7,6 +7,11 @@
 #
 # Override pricing via env vars in your shell:
 #   CC_PRICE_INPUT, CC_PRICE_OUTPUT, CC_PRICE_CACHE_WRITE, CC_PRICE_CACHE_READ
+#
+# Note: the $ amounts shown are LOCAL ESTIMATES at API rates — useful as a
+# continuous "what's this workload worth" indicator while you code. For an
+# authoritative current-5h plan-usage %, run `/usage` inside Claude Code
+# (server-side truth, not local approximation).
 
 input=$(cat)
 model=$(echo "$input" | jq -r '.model.display_name // "?"')

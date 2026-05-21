@@ -46,7 +46,7 @@ cc-limits        # 跨所有 transcript 的 token 用量与估算费用
 |------|:----:|------|
 | `cc-status` / `cc-watch` | ✅ | 跨项目的 session 仪表盘。`cc-watch` 自动刷新（默认 30 秒，可用 `REFRESH_INTERVAL=5` 缩短刷新间隔）|
 | `cc-resume` | ✅ | 用 `fzf` 模糊搜索所有项目的历史 session（按时间倒序），选中回车即跳转到 `claude --resume <id>` |
-| `cc-limits` | ✅ | Token 用量与估算费用：当前活跃进程的上下文大小、5h / 24h / N 天窗口聚合、消耗 token 最多的 session |
+| `cc-limits` | ✅ | 跨项目 token 用量 + 费用历史，任意窗口、watch 模式、statusline 集成 —— 与 Claude Code 内置 `/usage` 互补（`/usage` 才是当前 5h 配额的权威读数）|
 | `cc-daily` | ✅ | 给每个项目自动写 `daily-worklog.md`；可选 `--export obsidian` / `--export notion` 同步到外部 |
 | `cc-skill-init <name>` | ✅ | 一行命令在 `.claude/skills/<name>/` 生成完整 Skill 脚手架（含 frontmatter、Step-0 读上下文区块）|
 | `cc-pilot suggest` | ✅ | 扫描历史 transcript，找出你手动批准过 ≥ 5 次的 Bash 命令，据此推导 `permissions.allow` 规则。破坏性模式会被自动拦截，并附上触发拦截的具体命令 |
@@ -70,20 +70,7 @@ cc-resume                     # fzf 选择 → 回任意历史 session
 
 ### Token 用量与费用：`cc-limits`
 
-**首次配置** —— 设一次档位，然后用 `claude.ai/settings/usage` 上的真实读数把预算 % 锚定下来。配完之后 `cc-limits` 跟 dashboard 误差在 ±5pp 以内：
-
-```bash
-# 1. 设置你的档位（写进 ~/.zshrc 让它常驻）
-export CC_PLAN=max5                  # 可选值：pro | max5 | max20 | team | free
-
-# 2. 打开 claude.ai/settings/usage，记下 "Current session" 的 %
-# 3. 立即用那个 % 校准 cc-limits（动作越快越准）：
-cc-limits --calibrate 40             # 把 40 换成 dashboard 显示的数字
-```
-
-校准后的 cap 会保存在 `~/.claude/monitor/cc-plan.conf`。等你发现又开始偏离了，重新跑一次 `--calibrate <pct>` 即可；想撤销用 `--calibrate-clear`。
-
-**日常使用：**
+> **关于 `/usage`**：Claude Code 已经内置了 [`/usage`](https://code.claude.com/docs/en/costs#using-the-usage-command) 斜杠命令。在任意 Claude Code 会话里输入 `/usage`，会显示：当前 session 总成本（API 用户）、API / wall 总时长、代码增删行数；并且对 Pro/Max/Team 订阅用户**额外**显示来自 Anthropic 服务端的**权威** 5h plan-usage 条 + reset 倒计时。想一次性看"我现在到了多少 %"，直接用 `/usage`。它只能交互式运行（没有 JSON / CLI 形式），所以 `cc-limits` 在以下方面互补：跨项目历史、任意窗口费用、活跃进程、watch 模式、statusline 集成。
 
 ```bash
 cc-limits                            # 默认窗口：最近 24 小时
@@ -91,9 +78,24 @@ cc-limits -1h                        # 窗口简写：-30m | -1h | -7d | -30d | 
 cc-limits --watch                    # 自动刷新（30 秒）
 ```
 
-每个窗口都展示：活跃进程 · 该窗口聚合数据（token / 费用 / 按模型分类）· plan 预算（设了 `CC_PLAN` 时显示，永远锚定到当前 5h tumbling 块）· top sessions。
+每个窗口都显示：活跃进程 · 该窗口聚合（token / 费用 / 按模型分类）· top sessions。设了 `CC_PLAN` 还会加一个本地近似的 plan 预算块（锚定到当前 5h tumbling 块）。
 
-**完整参考**：[`docs/cc-limits.zh-CN.md`](./docs/cc-limits.zh-CN.md) —— Sonnet/Haiku 价格覆盖、tumbling 窗口工作原理、`% used` 为何漂移、周限额说明、watch 模式环境变量。
+**可选 —— plan 预算块**（在 watch / statusline 持续显示时有用）：
+
+```bash
+export CC_PLAN=max5                  # 可选值：pro | max5 | max20 | team | free
+```
+
+**可选 —— 校准**（仅在 statusline / watch 场景有意义；一次性查询直接用 `/usage`）：
+
+```bash
+# 1. 在 Claude Code 里跑 /usage（或打开 claude.ai/settings/usage），记下 %
+# 2. 一两分钟内：
+cc-limits --calibrate 40             # 把 40 换成实际看到的数字 —— 锚定到你账号的实际加权
+cc-limits --calibrate-clear          # 撤销，回到 plan 默认值
+```
+
+**完整参考**：[`docs/cc-limits.zh-CN.md`](./docs/cc-limits.zh-CN.md) —— 与 `/usage` 关系详解、Sonnet/Haiku 价格覆盖、tumbling 窗口工作原理、周限额说明、watch 模式环境变量。
 
 ### 每日工作日志：`cc-daily`
 
@@ -205,7 +207,7 @@ cc-bip-posted   # X / LinkedIn 发完帖跑一次 —— 超 24 小时状态栏�
 
 你账号是否始终合规取决于**你如何使用这些能力**，跟"是否经过工具包装"没有本质关系。用脚本跑 `git push --force` 跟你自己手敲它的性质是一样的 —— 都受你自己判断的约束。
 
-**关于 `cc-limits` 的 "% used" 估算** —— 所有数字都来自你本地的 transcript JSONL 文件。工具数 unique `requestId` 的数量，除以 plan 配额（Anthropic 公开声明的默认值，可通过 `--calibrate` 用你 dashboard 的真实读数校准）。没有 API 调用、没有爬取、没有触碰 Anthropic 内部数据 —— 只是对 Claude Code 已经写到你机器上的数据做算术。
+**关于 `cc-limits` 的 "% used" 估算** —— 所有数字都来自你本地的 transcript JSONL 文件。工具数 unique `requestId` 的数量，除以 plan 配额（Anthropic 公开声明的默认值，可通过 `--calibrate` 用 `/usage` 或 dashboard 的真实读数校准）。**想要当前窗口的权威 %，请用 Claude Code 内置的 `/usage`** —— 它直接查服务端。`cc-limits` 的算法全部本地：没有 API 调用、没有爬取、没有触碰 Anthropic 内部数据。
 
 ### 真实存在的风险（对你而言）
 
@@ -242,7 +244,8 @@ Alias 保留（`cc-status` 等仍可只读看现有数据），只是不再追�
 ## 注意事项
 
 - **平台**：在 macOS / zsh 实测过；BSD 与 GNU `stat` 已自动适配 Linux，但暂未实测。
-- **Plan 默认值会漂移**。`cc-limits` 的 5h-cap 默认值校对于 2026-05-07。Anthropic 调整时用 `CC_PLAN_MSG_LIMIT_5H` 覆盖。
+- **当前 5h 配额的权威读数请用 Claude Code 的 `/usage`**。`cc-limits` 的 plan 预算块只是本地近似 —— watch / statusline 持续显示有用，不是真相。
+- **Plan 默认值会漂移**。`cc-limits` 的 5h-cap 默认值校对于 2026-05-07。Anthropic 调整时用 `CC_PLAN_MSG_LIMIT_5H` 覆盖（或者直接看 `/usage`）。
 - **周限额尚未建模**。Anthropic 还有独立的 7 天滚动上限；`cc-limits` 目前只显示 5h 窗口。
 
 ---

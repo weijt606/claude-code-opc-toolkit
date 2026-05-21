@@ -46,7 +46,7 @@ For prompt-count stats and subagent tracking, also merge the `hooks` block from 
 |------|:------:|--------------|
 | `cc-status` / `cc-watch` | ✅ | Cross-project session dashboard. Live mode with `cc-watch` (30s default; `REFRESH_INTERVAL=5` for tighter). |
 | `cc-resume` | ✅ | Fuzzy-search picker across every past session (uses `fzf`), sorted by recency → `claude --resume <id>`. |
-| `cc-limits` | ✅ | Token usage + estimated cost. Live processes, 5h / 24h / N-day windows, top sessions. |
+| `cc-limits` | ✅ | Cross-project token usage + cost history with arbitrary windows, watch mode, statusline integration — complements Claude Code's built-in `/usage` (which is the authoritative source for current 5h quota). |
 | `cc-daily` | ✅ | Per-project `daily-worklog.md` writer. Optional `--export obsidian` / `--export notion`. |
 | `cc-skill-init <name>` | ✅ | Scaffold `.claude/skills/<name>/` with frontmatter, Step-0 read-context, README, prompts, templates. |
 | `cc-pilot suggest` | ✅ | Read past transcripts, suggest `permissions.allow` patterns from Bash commands you've manually approved ≥ 5×. Refuses destructive patterns; shows the triggering command when blocking. |
@@ -70,20 +70,7 @@ cc-resume                     # fzf picker — pick any past session, Enter to r
 
 ### Token usage & cost: `cc-limits`
 
-**One-time setup** — set your plan once, then anchor the budget % to your real `claude.ai/settings/usage` reading. After this, `cc-limits` matches the dashboard within ±5 pp:
-
-```bash
-# 1. Set your plan (add this line to ~/.zshrc so it sticks)
-export CC_PLAN=max5                  # one of: pro | max5 | max20 | team | free
-
-# 2. Open claude.ai/settings/usage in your browser, note the "Current session" %
-# 3. Calibrate cc-limits against that reading — do this immediately after step 2:
-cc-limits --calibrate 40             # whatever % the dashboard showed
-```
-
-The calibrated cap is saved to `~/.claude/monitor/cc-plan.conf`. Re-run `--calibrate <pct>` when you notice drift; clear with `--calibrate-clear`.
-
-**Daily use:**
+> **Quick note on `/usage`**: Claude Code now ships a built-in [`/usage`](https://code.claude.com/docs/en/costs#using-the-usage-command) slash command. Type `/usage` in any Claude Code session and you get: total session cost (API users), total API / wall duration, lines added/removed, and — for Pro/Max/Team subscribers — the **authoritative** current 5h plan-usage bar + reset countdown straight from Anthropic's server. For "where am I right now?" — just run `/usage`. It's interactive-only (no JSON/CLI form), so `cc-limits` complements it with: cross-project history, cost in arbitrary windows, live processes, watch mode, statusline integration.
 
 ```bash
 cc-limits                            # default window: last 24 hours
@@ -91,9 +78,24 @@ cc-limits -1h                        # window shorthand: -30m | -1h | -7d | -30d
 cc-limits --watch                    # auto-refresh (30 s)
 ```
 
-Every window shows: live processes · window aggregates (tokens / cost / per-model) · plan budget (always anchored to the current 5 h tumbling block when `CC_PLAN` is set) · top sessions by output.
+Every window shows: live processes · window aggregates (tokens / cost / per-model) · top sessions by output. With `CC_PLAN` set, also adds a local-approximation plan-budget block (anchored to the current 5h tumbling block).
 
-**Full reference**: [`docs/cc-limits.md`](./docs/cc-limits.md) — pricing overrides for Sonnet/Haiku, tumbling-window mechanics, why `% used` drifts, weekly-cap caveats, watch-mode env vars.
+**Optional — plan budget block** (for continuous display in watch / statusline):
+
+```bash
+export CC_PLAN=max5                  # one of: pro | max5 | max20 | team | free
+```
+
+**Optional — calibration** (only useful for statusline / watch where running `/usage` repeatedly isn't ergonomic):
+
+```bash
+# 1. Run /usage in Claude Code (or open claude.ai/settings/usage), note the %
+# 2. Within a minute or two:
+cc-limits --calibrate 40             # whatever % was shown — anchors local % to your account's weighting
+cc-limits --calibrate-clear          # revert to plan defaults
+```
+
+**Full reference**: [`docs/cc-limits.md`](./docs/cc-limits.md) — `/usage` relationship in detail, pricing overrides for Sonnet/Haiku, tumbling-window mechanics, weekly-cap caveats, watch-mode env vars.
 
 ### Daily worklog: `cc-daily`
 
@@ -205,7 +207,7 @@ This toolkit reads only **local files Claude Code writes for you**. It makes zer
 
 Whether your account stays in good standing depends on **how you use these capabilities**, not on the wrapper. Running `git push --force` from a wrapper script isn't materially different from typing it yourself — both are bound by your own judgment.
 
-**On the `cc-limits` "% used" estimate** — every number is computed locally from your own transcript JSONL files. The tool counts unique `requestId` values and divides by the plan cap (Anthropic-published defaults; you can override via `--calibrate` against your real `claude.ai/settings/usage` reading). No API call, no scraping, no Anthropic-internal data — just arithmetic on data Claude Code already saved on your machine.
+**On the `cc-limits` "% used" estimate** — every number is computed locally from your own transcript JSONL files. The tool counts unique `requestId` values and divides by the plan cap (Anthropic-published defaults; you can override via `--calibrate` against `/usage` or your `claude.ai/settings/usage` reading). For an authoritative current-window %, prefer Claude Code's built-in `/usage` slash command — it queries the server directly. `cc-limits`' arithmetic is all-local: no API call, no scraping, no Anthropic-internal data.
 
 ### Real risks worth knowing about
 
@@ -240,7 +242,8 @@ I haven't read every line of Anthropic's full ToS and can't promise some clause 
 ## Caveats
 
 - **Tested on macOS / zsh**; should work on Linux (BSD/GNU `stat` auto-detected) but not yet verified.
-- **Plan defaults drift**. `cc-limits` ships with 5h-cap defaults verified 2026-05-07. Anthropic adjusts these — override with `CC_PLAN_MSG_LIMIT_5H` when they do.
+- **For authoritative current 5h quota %, use Claude Code's `/usage`.** `cc-limits`' plan-budget block is a local approximation — useful for watch / statusline, not as ground truth.
+- **Plan defaults drift**. `cc-limits` ships with 5h-cap defaults verified 2026-05-07. Anthropic adjusts these — override with `CC_PLAN_MSG_LIMIT_5H` (or just check `/usage`).
 - **Weekly rate-limit cap is not yet modeled**. Anthropic enforces a separate 7-day rolling cap; `cc-limits` only shows the 5h window.
 
 ---
